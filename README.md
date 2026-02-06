@@ -1,6 +1,8 @@
 # DailyBot CLI
 
-Submit check-in updates from your terminal.
+A command-line interface for [DailyBot](https://www.dailybot.com) that lets **people** and **software agents** share progress updates, blockers, and feedback — straight from the terminal.
+
+Whether you're a developer who lives in the terminal or an AI agent running in a CI pipeline, the DailyBot CLI gives you a fast way to submit check-ins without leaving your workflow.
 
 ## Installation
 
@@ -16,55 +18,55 @@ curl -sSL https://cli.dailybot.com/install.sh | bash
 
 Requires Python 3.9+.
 
-## Quick start
+## For humans
 
+Authenticate once with your DailyBot email, then submit updates and check pending check-ins right from your terminal.
+
+```bash
+# Log in (one-time setup, email OTP)
+dailybot auth login
+
+# See what check-ins are waiting for you
+dailybot status
+
+# Submit a free-text update
+dailybot update "Finished the auth module, starting on tests."
+
+# Or use structured fields
+dailybot update --done "Auth module" --doing "Tests" --blocked "None"
 ```
-dailybot auth login          # Authenticate with email OTP
-dailybot status              # View pending check-ins
-dailybot update "message"    # Submit a free-text update
-dailybot update --done "X" --doing "Y" --blocked "None"
+
+Run `dailybot` with no arguments to enter **interactive mode**, which walks you through submitting an update step by step.
+
+## For agents
+
+Any software agent — AI coding assistants, CI jobs, deploy scripts, bots — can report activity through the CLI using an API key. This lets teams get visibility into what automated processes are doing, alongside human updates.
+
+Set the `DAILYBOT_API_KEY` environment variable, then:
+
+```bash
+# Report a deployment
+dailybot agent update "Deployed v2.1 to staging"
+
+# Name the agent so the team knows who's reporting
+dailybot agent update "Built feature X" --name "Claude Code"
+
+# Include structured data
+dailybot agent update "Tests passed" --name "CI Bot" --json-data '{"suite": "integration", "passed": 42}'
 ```
 
-## Agent mode
+## Commands
 
-Requires the `DAILYBOT_API_KEY` environment variable:
+| Command | Description |
+|---|---|
+| `dailybot auth login` | Authenticate with email OTP |
+| `dailybot auth status` | Show current login status |
+| `dailybot auth logout` | Log out and revoke token |
+| `dailybot status` | Show pending check-ins for today |
+| `dailybot update` | Submit a check-in update (free-text or structured) |
+| `dailybot agent update` | Submit an agent activity report (API key) |
 
-```
-dailybot agent update "Deployed v2.1" --name "My Agent"
-```
-
-## Interactive mode
-
-Run `dailybot` without arguments to enter interactive mode.
-
-## Usage
-
-```
-Usage: dailybot [OPTIONS] COMMAND [ARGS]...
-
-  DailyBot CLI - Submit check-in updates from your terminal.
-
-  Quick start:
-    dailybot auth login          # Authenticate with email OTP
-    dailybot status              # View pending check-ins
-    dailybot update "message"    # Submit a free-text update
-    dailybot update --done "X" --doing "Y" --blocked "None"
-
-  Agent mode (requires DAILYBOT_API_KEY env var):
-    dailybot agent update "Deployed v2.1" --name "My Agent"
-
-  Run without arguments for interactive mode.
-
-Options:
-  --version  Show the version and exit.
-  --help     Show this message and exit.
-
-Commands:
-  agent   Submit updates via API key (for agents / CI).
-  auth    Manage authentication.
-  status  Show pending check-ins.
-  update  Submit a check-in update.
-```
+Run `dailybot --help` for full details on any command.
 
 ## Development
 
