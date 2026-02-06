@@ -7,6 +7,13 @@ from typing import Any, Optional
 
 
 DEFAULT_API_URL: str = "https://api.dailybot.com"
+_api_url_override: Optional[str] = None
+
+
+def set_api_url_override(url: str) -> None:
+    """Set a CLI-level API URL override (from --api-url flag)."""
+    global _api_url_override
+    _api_url_override = url.rstrip("/")
 CONFIG_DIR: Path = Path.home() / ".config" / "dailybot"
 CREDENTIALS_FILE: Path = CONFIG_DIR / "credentials.json"
 
@@ -60,7 +67,9 @@ def clear_credentials() -> None:
 
 
 def get_api_url() -> str:
-    """Return the API URL from credentials or environment or default."""
+    """Return the API URL (--api-url flag > env var > credentials > default)."""
+    if _api_url_override:
+        return _api_url_override
     env_url: Optional[str] = os.environ.get("DAILYBOT_API_URL")
     if env_url:
         return env_url.rstrip("/")

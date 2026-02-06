@@ -2,18 +2,22 @@
 
 import click
 
+from typing import Optional
+
 from dailybot_cli import __version__
 from dailybot_cli.commands.agent import agent
 from dailybot_cli.commands.auth import auth
 from dailybot_cli.commands.interactive import run_interactive
 from dailybot_cli.commands.status import status
 from dailybot_cli.commands.update import update
+from dailybot_cli.config import set_api_url_override
 
 
 @click.group(invoke_without_command=True)
 @click.version_option(version=__version__, prog_name="dailybot")
+@click.option("--api-url", default=None, envvar="DAILYBOT_API_URL", help="Override the API base URL (e.g. staging).")
 @click.pass_context
-def cli(ctx: click.Context) -> None:
+def cli(ctx: click.Context, api_url: Optional[str]) -> None:
     """DailyBot CLI - Submit check-in updates from your terminal.
 
     \b
@@ -29,6 +33,8 @@ def cli(ctx: click.Context) -> None:
 
     Run without arguments for interactive mode.
     """
+    if api_url:
+        set_api_url_override(api_url)
     if ctx.invoked_subcommand is None:
         run_interactive()
 

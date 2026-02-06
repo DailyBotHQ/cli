@@ -29,6 +29,28 @@ class TestVersionAndHelp:
         assert "update" in result.output
         assert "status" in result.output
         assert "agent" in result.output
+        assert "--api-url" in result.output
+
+    @patch("dailybot_cli.main.set_api_url_override")
+    @patch("dailybot_cli.commands.update.get_token")
+    @patch("dailybot_cli.commands.update.DailyBotClient")
+    def test_api_url_override(
+        self,
+        mock_client_cls: MagicMock,
+        mock_get_token: MagicMock,
+        mock_set_override: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        mock_get_token.return_value = "tok"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_update.return_value = {
+            "followups_count": 1,
+            "attached_followups": [{"followup_name": "Standup", "action": "created"}],
+        }
+
+        result = runner.invoke(cli, ["--api-url", "https://staging.dailybot.com", "update", "test"])
+        assert result.exit_code == 0
+        mock_set_override.assert_called_once_with("https://staging.dailybot.com")
 
 
 class TestAuthCommands:
