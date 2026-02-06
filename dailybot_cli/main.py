@@ -6,7 +6,7 @@ from typing import Optional
 
 from dailybot_cli import __version__
 from dailybot_cli.commands.agent import agent
-from dailybot_cli.commands.auth import auth
+from dailybot_cli.commands.auth import login, logout
 from dailybot_cli.commands.interactive import run_interactive
 from dailybot_cli.commands.status import status
 from dailybot_cli.commands.update import update
@@ -22,7 +22,7 @@ def cli(ctx: click.Context, api_url: Optional[str]) -> None:
 
     \b
     Quick start:
-      dailybot auth login          # Authenticate with email OTP
+      dailybot login               # Authenticate with email OTP
       dailybot status              # View pending check-ins
       dailybot update "message"    # Submit a free-text update
       dailybot update --done "X" --doing "Y" --blocked "None"
@@ -39,7 +39,8 @@ def cli(ctx: click.Context, api_url: Optional[str]) -> None:
         run_interactive()
 
 
-cli.add_command(auth)
+cli.add_command(login)
+cli.add_command(logout)
 cli.add_command(update)
 cli.add_command(status)
 cli.add_command(agent)

@@ -3,25 +3,94 @@
 from typing import Any, Optional
 
 import click
+import questionary
 
 from dailybot_cli.api_client import APIError, DailyBotClient
-from dailybot_cli.config import get_token, load_credentials
+from dailybot_cli.config import get_token, load_credentials, save_credentials
 from dailybot_cli.display import (
     console,
     print_error,
     print_info,
+    print_org_selection,
     print_pending_checkins,
     print_success,
     print_update_result,
 )
 
 
-MENU_OPTIONS: list[tuple[str, str]] = [
-    ("1", "Send update"),
-    ("2", "View pending check-ins"),
-    ("3", "Auth status"),
-    ("q", "Quit"),
+MENU_SEND_UPDATE: str = "Send update"
+MENU_VIEW_PENDING: str = "View pending check-ins"
+MENU_AUTH_STATUS: str = "Auth status"
+MENU_QUIT: str = "Quit"
+
+MENU_CHOICES: list[str] = [
+    MENU_SEND_UPDATE,
+    MENU_VIEW_PENDING,
+    MENU_AUTH_STATUS,
+    MENU_QUIT,
 ]
+
+
+def _interactive_login() -> None:
+    """Guide the user through authentication inside interactive mode."""
+    console.print()
+    print_info("Let's get you logged in.")
+    console.print()
+
+    email: str = click.prompt("Email")
+    client: DailyBotClient = DailyBotClient()
+
+    try:
+        with console.status("Sending verification code..."):
+            client.request_code(email)
+    except APIError as e:
+        print_error(e.detail)
+        raise SystemExit(1)
+
+    print_success(f"Verification code sent to {email}")
+    print_info("Check your inbox (including spam folder).")
+
+    code: str = click.prompt("Enter the 6-digit code", type=str).strip()
+
+    try:
+        with console.status("Verifying code..."):
+            result: dict[str, Any] = client.verify_code(email, code)
+    except APIError as e:
+        print_error(e.detail)
+        raise SystemExit(1)
+
+    if result.get("organization_selection_required"):
+        organizations: list[dict[str, Any]] = result.get("organizations", [])
+        print_info("You belong to multiple organizations. Please select one:")
+        print_org_selection(organizations)
+        choice: int = click.prompt("Select organization number", type=int)
+        if choice < 1 or choice > len(organizations):
+            print_error("Invalid selection.")
+            raise SystemExit(1)
+        selected_org: dict[str, Any] = organizations[choice - 1]
+        try:
+            with console.status("Verifying..."):
+                result = client.verify_code(email, code, organization_id=selected_org["id"])
+        except APIError as e:
+            print_error(e.detail)
+            raise SystemExit(1)
+
+    token: Optional[str] = result.get("token")
+    if not token:
+        print_error("Authentication failed: no token received.")
+        raise SystemExit(1)
+
+    org_raw: Any = result.get("organization", "")
+    org_name: str = org_raw.get("name", "") if isinstance(org_raw, dict) else str(org_raw)
+    org_uuid: str = org_raw.get("uuid", "") if isinstance(org_raw, dict) else result.get("organization_uuid", "")
+    save_credentials(
+        token=token,
+        email=email,
+        organization=org_name,
+        organization_uuid=org_uuid,
+        api_url=client.api_url,
+    )
+    print_success(f"Logged in as {email} ({org_name})")
 
 
 def run_interactive() -> None:
@@ -29,35 +98,35 @@ def run_interactive() -> None:
     creds: Optional[dict[str, Any]] = load_credentials()
     token: Optional[str] = get_token()
 
-    if not token or not creds:
-        print_info("Not logged in. Run: dailybot auth login")
-        raise SystemExit(1)
+    console.print(f"\n[bold]DailyBot CLI[/bold]")
 
-    email: str = creds.get("email", "")
-    org: str = creds.get("organization", "")
-    console.print(f"[bold]DailyBot CLI[/bold] - {email} ({org})\n")
+    if not token or not creds:
+        _interactive_login()
+        creds = load_credentials()
+
+    email: str = creds.get("email", "") if creds else ""
+    org_stored: Any = creds.get("organization", "") if creds else ""
+    org: str = org_stored.get("name", "") if isinstance(org_stored, dict) else str(org_stored)
+    console.print(f"Logged in as {email} ({org})\n")
 
     client: DailyBotClient = DailyBotClient()
 
     while True:
         console.print()
-        for key, label in MENU_OPTIONS:
-            console.print(f"  [bold]{key}[/bold]) {label}")
-        console.print()
+        choice: Optional[str] = questionary.select(
+            "What would you like to do?",
+            choices=MENU_CHOICES,
+        ).ask()
 
-        choice: str = click.prompt("Choose", type=str, default="1").strip().lower()
-
-        if choice == "1":
-            _send_update(client)
-        elif choice == "2":
-            _view_pending(client)
-        elif choice == "3":
-            _show_auth(client)
-        elif choice in ("q", "quit", "exit"):
+        if choice is None or choice == MENU_QUIT:
             print_info("Goodbye!")
             break
-        else:
-            print_error("Invalid choice.")
+        elif choice == MENU_SEND_UPDATE:
+            _send_update(client)
+        elif choice == MENU_VIEW_PENDING:
+            _view_pending(client)
+        elif choice == MENU_AUTH_STATUS:
+            _show_auth(client)
 
 
 def _send_update(client: DailyBotClient) -> None:

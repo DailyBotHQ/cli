@@ -5,10 +5,9 @@ from typing import Any, Optional
 import click
 
 from dailybot_cli.api_client import APIError, DailyBotClient
-from dailybot_cli.config import clear_credentials, get_token, load_credentials, save_credentials
+from dailybot_cli.config import clear_credentials, get_token, save_credentials
 from dailybot_cli.display import (
     console,
-    print_auth_status,
     print_error,
     print_info,
     print_org_selection,
@@ -16,16 +15,8 @@ from dailybot_cli.display import (
 )
 
 
-@click.group()
-def auth() -> None:
-    """Manage authentication."""
-    pass
-
-
-@auth.command(name="login")
-@click.option("--email", prompt="Email", help="Your DailyBot account email.")
-def login(email: str) -> None:
-    """Authenticate with DailyBot via email OTP."""
+def _do_login(email: str) -> None:
+    """Shared login logic used by both 'dailybot login' and 'dailybot login'."""
     client: DailyBotClient = DailyBotClient()
     # Step 1: Request OTP code
     try:
@@ -73,38 +64,27 @@ def login(email: str) -> None:
         print_error("Authentication failed: no token received.")
         raise SystemExit(1)
 
+    org_raw: Any = result.get("organization", "")
+    org_name: str = org_raw.get("name", "") if isinstance(org_raw, dict) else str(org_raw)
+    org_uuid: str = org_raw.get("uuid", "") if isinstance(org_raw, dict) else result.get("organization_uuid", "")
     save_credentials(
         token=token,
         email=email,
-        organization=result.get("organization", ""),
-        organization_id=result.get("organization_id", 0),
+        organization=org_name,
+        organization_uuid=org_uuid,
         api_url=client.api_url,
     )
-    print_success(f"Logged in as {email} ({result.get('organization', '')})")
+    print_success(f"Logged in as {email} ({org_name})")
 
 
-@auth.command(name="status")
-def status() -> None:
-    """Show current authentication status."""
-    creds: Optional[dict[str, Any]] = load_credentials()
-    if not creds:
-        print_info("Not logged in. Run: dailybot auth login")
-        return
-
-    client: DailyBotClient = DailyBotClient()
-    try:
-        data: dict[str, Any] = client.auth_status()
-        print_auth_status(data)
-    except APIError as e:
-        if e.status_code in (401, 403):
-            print_error("Session expired. Please log in again: dailybot auth login")
-            clear_credentials()
-        else:
-            print_error(e.detail)
-        raise SystemExit(1)
+@click.command()
+@click.option("--email", prompt="Email", help="Your DailyBot account email.")
+def login(email: str) -> None:
+    """Authenticate with DailyBot via email OTP."""
+    _do_login(email)
 
 
-@auth.command(name="logout")
+@click.command()
 def logout() -> None:
     """Log out and revoke the current token."""
     token: Optional[str] = get_token()

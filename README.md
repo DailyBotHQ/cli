@@ -24,7 +24,7 @@ Authenticate once with your DailyBot email, then submit updates and check pendin
 
 ```bash
 # Log in (one-time setup, email OTP)
-dailybot auth login
+dailybot login
 
 # See what check-ins are waiting for you
 dailybot status
@@ -36,7 +36,7 @@ dailybot update "Finished the auth module, starting on tests."
 dailybot update --done "Auth module" --doing "Tests" --blocked "None"
 ```
 
-Run `dailybot` with no arguments to enter **interactive mode**, which walks you through submitting an update step by step.
+Run `dailybot` with no arguments to enter **interactive mode** — if you're not logged in yet, it will walk you through authentication first, then let you submit updates step by step.
 
 ## For agents
 
@@ -59,9 +59,8 @@ dailybot agent update "Tests passed" --name "CI Bot" --json-data '{"suite": "int
 
 | Command | Description |
 |---|---|
-| `dailybot auth login` | Authenticate with email OTP |
-| `dailybot auth status` | Show current login status |
-| `dailybot auth logout` | Log out and revoke token |
+| `dailybot login` | Authenticate with email OTP |
+| `dailybot logout` | Log out and revoke token |
 | `dailybot status` | Show pending check-ins for today |
 | `dailybot update` | Submit a check-in update (free-text or structured) |
 | `dailybot agent update` | Submit an agent activity report (API key) |

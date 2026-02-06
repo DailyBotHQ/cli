@@ -14,7 +14,7 @@ def status() -> None:
     """Show pending check-ins for today."""
     token: Optional[str] = get_token()
     if not token:
-        print_error("Not logged in. Run: dailybot auth login")
+        print_error("Not logged in. Run: dailybot login")
         raise SystemExit(1)
 
     client: DailyBotClient = DailyBotClient()
@@ -25,7 +25,7 @@ def status() -> None:
         print_pending_checkins(checkins)
     except APIError as e:
         if e.status_code in (401, 403):
-            print_error("Session expired. Please log in again: dailybot auth login")
+            print_error("Session expired. Please log in again: dailybot login")
         else:
             print_error(e.detail)
         raise SystemExit(1)

@@ -39,7 +39,7 @@ def save_credentials(
     token: str,
     email: str,
     organization: str,
-    organization_id: int,
+    organization_uuid: str,
     api_url: str = DEFAULT_API_URL,
 ) -> None:
     """Save credentials to disk."""
@@ -50,7 +50,7 @@ def save_credentials(
                 "token": token,
                 "email": email,
                 "organization": organization,
-                "organization_id": organization_id,
+                "organization_uuid": organization_uuid,
                 "api_url": api_url,
             },
             indent=2,

@@ -33,14 +33,14 @@ def test_save_and_load_credentials(tmp_config: Path) -> None:
         token="tok123",
         email="user@example.com",
         organization="MyOrg",
-        organization_id=42,
+        organization_uuid="org-uuid-42",
     )
     creds: Optional[dict[str, Any]] = load_credentials()
     assert creds is not None
     assert creds["token"] == "tok123"
     assert creds["email"] == "user@example.com"
     assert creds["organization"] == "MyOrg"
-    assert creds["organization_id"] == 42
+    assert creds["organization_uuid"] == "org-uuid-42"
 
 
 def test_load_credentials_no_file(tmp_config: Path) -> None:
@@ -48,7 +48,7 @@ def test_load_credentials_no_file(tmp_config: Path) -> None:
 
 
 def test_clear_credentials(tmp_config: Path) -> None:
-    save_credentials(token="t", email="e", organization="o", organization_id=1)
+    save_credentials(token="t", email="e", organization="o", organization_uuid="uuid-1")
     clear_credentials()
     assert load_credentials() is None
 
@@ -70,7 +70,7 @@ def test_get_token_from_env(tmp_config: Path, monkeypatch: pytest.MonkeyPatch) -
 
 def test_get_token_from_credentials(tmp_config: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DAILYBOT_CLI_TOKEN", raising=False)
-    save_credentials(token="file_token", email="e", organization="o", organization_id=1)
+    save_credentials(token="file_token", email="e", organization="o", organization_uuid="uuid-1")
     assert get_token() == "file_token"
 
 
@@ -85,7 +85,7 @@ def test_get_api_key_not_set(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_credentials_file_permissions(tmp_config: Path) -> None:
-    save_credentials(token="t", email="e", organization="o", organization_id=1)
+    save_credentials(token="t", email="e", organization="o", organization_uuid="uuid-1")
     creds_file: Path = tmp_config / "credentials.json"
     mode: int = os.stat(creds_file).st_mode & 0o777
     assert mode == 0o600

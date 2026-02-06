@@ -25,7 +25,8 @@ class TestVersionAndHelp:
     def test_help(self, runner: CliRunner) -> None:
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "auth" in result.output
+        assert "login" in result.output
+        assert "logout" in result.output
         assert "update" in result.output
         assert "status" in result.output
         assert "agent" in result.output
@@ -53,18 +54,11 @@ class TestVersionAndHelp:
         mock_set_override.assert_called_once_with("https://staging.dailybot.com")
 
 
-class TestAuthCommands:
-
-    def test_auth_help(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["auth", "--help"])
-        assert result.exit_code == 0
-        assert "login" in result.output
-        assert "logout" in result.output
-        assert "status" in result.output
+class TestLoginShortcut:
 
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     @patch("dailybot_cli.commands.auth.save_credentials")
-    def test_auth_login_success(
+    def test_top_level_login(
         self,
         mock_save: MagicMock,
         mock_client_cls: MagicMock,
@@ -76,50 +70,22 @@ class TestAuthCommands:
         mock_client.verify_code.return_value = {
             "token": "tok123",
             "organization": "MyOrg",
-            "organization_id": 1,
+            "organization_uuid": "org-uuid-456",
         }
 
-        result = runner.invoke(cli, ["auth", "login"], input="user@test.com\n123456\n")
+        result = runner.invoke(cli, ["login"], input="user@test.com\n123456\n")
         assert result.exit_code == 0
         assert "Logged in" in result.output
+        assert "MyOrg" in result.output
         mock_save.assert_called_once()
 
-    @patch("dailybot_cli.commands.auth.DailyBotClient")
-    def test_auth_login_bad_email(
-        self, mock_client_cls: MagicMock, runner: CliRunner
-    ) -> None:
-        from dailybot_cli.api_client import APIError
 
-        mock_client: MagicMock = mock_client_cls.return_value
-        mock_client.request_code.side_effect = APIError(400, "No account found")
-
-        result = runner.invoke(cli, ["auth", "login"], input="bad@test.com\n")
-        assert result.exit_code != 0
-
-    @patch("dailybot_cli.commands.auth.load_credentials")
-    @patch("dailybot_cli.commands.auth.DailyBotClient")
-    def test_auth_status_success(
-        self,
-        mock_client_cls: MagicMock,
-        mock_load: MagicMock,
-        runner: CliRunner,
-    ) -> None:
-        mock_load.return_value = {"token": "tok", "email": "u@t.com"}
-        mock_client: MagicMock = mock_client_cls.return_value
-        mock_client.auth_status.return_value = {
-            "email": "u@t.com",
-            "organization": "Org",
-            "expires_at": "2026-05-01",
-        }
-
-        result = runner.invoke(cli, ["auth", "status"])
-        assert result.exit_code == 0
-        assert "u@t.com" in result.output
+class TestLogoutCommand:
 
     @patch("dailybot_cli.commands.auth.get_token")
     @patch("dailybot_cli.commands.auth.clear_credentials")
     @patch("dailybot_cli.commands.auth.DailyBotClient")
-    def test_auth_logout(
+    def test_logout(
         self,
         mock_client_cls: MagicMock,
         mock_clear: MagicMock,
@@ -130,10 +96,19 @@ class TestAuthCommands:
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.logout.return_value = {}
 
-        result = runner.invoke(cli, ["auth", "logout"])
+        result = runner.invoke(cli, ["logout"])
         assert result.exit_code == 0
         assert "Logged out" in result.output
         mock_clear.assert_called_once()
+
+    @patch("dailybot_cli.commands.auth.get_token")
+    def test_logout_not_logged_in(
+        self, mock_get_token: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_token.return_value = None
+        result = runner.invoke(cli, ["logout"])
+        assert result.exit_code == 0
+        assert "Not logged in" in result.output
 
 
 class TestUpdateCommand:
@@ -268,6 +243,44 @@ class TestStatusCommand:
         result = runner.invoke(cli, ["status"])
         assert result.exit_code == 0
         assert "No pending" in result.output
+
+
+class TestInteractiveLogin:
+
+    @patch("dailybot_cli.commands.interactive.questionary")
+    @patch("dailybot_cli.commands.interactive.DailyBotClient")
+    @patch("dailybot_cli.commands.interactive.save_credentials")
+    @patch("dailybot_cli.commands.interactive.load_credentials")
+    @patch("dailybot_cli.commands.interactive.get_token")
+    def test_interactive_guides_login_when_not_authenticated(
+        self,
+        mock_get_token: MagicMock,
+        mock_load_creds: MagicMock,
+        mock_save: MagicMock,
+        mock_client_cls: MagicMock,
+        mock_questionary: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        # First call: not logged in; second call (after login): return creds
+        mock_get_token.return_value = None
+        mock_load_creds.side_effect = [
+            None,
+            {"token": "tok", "email": "u@t.com", "organization": "Org"},
+        ]
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.request_code.return_value = {}
+        mock_client.verify_code.return_value = {
+            "token": "tok",
+            "organization": "Org",
+            "organization_uuid": "uuid-1",
+        }
+        # Mock questionary.select to return "Quit"
+        mock_questionary.select.return_value.ask.return_value = "Quit"
+        # Provide email and OTP code for the login flow
+        result = runner.invoke(cli, [], input="u@t.com\n123456\n")
+        assert "Logged in" in result.output
+        mock_save.assert_called_once()
 
 
 class TestAgentCommand:

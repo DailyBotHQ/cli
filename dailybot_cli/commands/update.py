@@ -13,7 +13,7 @@ def _require_auth() -> DailyBotClient:
     """Ensure user is authenticated, return a client."""
     token: Optional[str] = get_token()
     if not token:
-        print_error("Not logged in. Run: dailybot auth login")
+        print_error("Not logged in. Run: dailybot login")
         raise SystemExit(1)
     return DailyBotClient()
 
@@ -73,7 +73,7 @@ def update(
         print_update_result(result)
     except APIError as e:
         if e.status_code in (401, 403):
-            print_error("Session expired. Please log in again: dailybot auth login")
+            print_error("Session expired. Please log in again: dailybot login")
         elif e.status_code == 400 and "ai processing failed" in e.detail.lower():
             print_error(
                 "DailyBot could not process your message. "

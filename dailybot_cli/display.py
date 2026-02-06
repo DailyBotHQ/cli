@@ -88,7 +88,7 @@ def print_org_selection(organizations: list[dict[str, Any]]) -> None:
     table: Table = Table(show_header=True, box=None)
     table.add_column("#", style="bold")
     table.add_column("Organization")
-    table.add_column("ID", style="dim")
+    table.add_column("UUID", style="dim")
     for i, org in enumerate(organizations, 1):
-        table.add_row(str(i), str(org.get("name", "")), str(org.get("id", "")))
+        table.add_row(str(i), str(org.get("name", "")), str(org.get("uuid", "")))
     console.print(table)
