@@ -153,6 +153,54 @@ class TestUpdateCommand:
         )
 
     @patch("dailybot_cli.commands.update.get_token")
+    @patch("dailybot_cli.commands.update.DailyBotClient")
+    def test_update_shows_submitted_for_created(
+        self, mock_client_cls: MagicMock, mock_get_token: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_token.return_value = "tok"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_update.return_value = {
+            "followups_count": 1,
+            "attached_followups": [{"followup_name": "Standup", "action": "created"}],
+        }
+
+        result = runner.invoke(cli, ["update", "Did some work"])
+        assert result.exit_code == 0
+        assert "Submitted" in result.output
+
+    @patch("dailybot_cli.commands.update.get_token")
+    @patch("dailybot_cli.commands.update.DailyBotClient")
+    def test_update_shows_updated_for_enriched(
+        self, mock_client_cls: MagicMock, mock_get_token: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_token.return_value = "tok"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_update.return_value = {
+            "followups_count": 1,
+            "attached_followups": [{"followup_name": "Standup", "action": "updated"}],
+        }
+
+        result = runner.invoke(cli, ["update", "More progress"])
+        assert result.exit_code == 0
+        assert "Updated" in result.output
+
+    @patch("dailybot_cli.commands.update.get_token")
+    @patch("dailybot_cli.commands.update.DailyBotClient")
+    def test_update_ai_processing_failed(
+        self, mock_client_cls: MagicMock, mock_get_token: MagicMock, runner: CliRunner
+    ) -> None:
+        from dailybot_cli.api_client import APIError
+
+        mock_get_token.return_value = "tok"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_update.side_effect = APIError(400, "AI processing failed for input")
+
+        result = runner.invoke(cli, ["update", "???"])
+        assert result.exit_code != 0
+        assert "could not process" in result.output
+        assert "support@dailybot.com" in result.output
+
+    @patch("dailybot_cli.commands.update.get_token")
     def test_update_not_logged_in(
         self, mock_get_token: MagicMock, runner: CliRunner
     ) -> None:

@@ -74,6 +74,11 @@ def update(
     except APIError as e:
         if e.status_code in (401, 403):
             print_error("Session expired. Please log in again: dailybot auth login")
+        elif e.status_code == 400 and "ai processing failed" in e.detail.lower():
+            print_error(
+                "DailyBot could not process your message. "
+                "Please try again, and if the issue persists contact support@dailybot.com"
+            )
         else:
             print_error(e.detail)
         raise SystemExit(1)

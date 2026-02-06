@@ -1,3 +1,5 @@
+LICENSE
+README.md
 pyproject.toml
 dailybot_cli/__init__.py
 dailybot_cli/api_client.py

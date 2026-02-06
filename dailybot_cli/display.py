@@ -77,7 +77,10 @@ def print_update_result(data: dict[str, Any]) -> None:
         return
     print_success(f"Update submitted to {count} check-in(s)")
     for followup in attached:
-        console.print(f"  [dim]-[/dim] {followup.get('followup_name', '')}")
+        name: str = followup.get("followup_name", "")
+        action: str = followup.get("action", "created")
+        label: str = "Updated" if action == "updated" else "Submitted"
+        console.print(f"  [dim]-[/dim] {name} [dim]({label})[/dim]")
 
 
 def print_org_selection(organizations: list[dict[str, Any]]) -> None:
