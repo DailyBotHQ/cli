@@ -1,0 +1,167 @@
+"""Tests for the API client module."""
+
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import httpx
+import pytest
+
+from dailybot_cli.api_client import APIError, DailyBotClient
+
+
+@pytest.fixture
+def client() -> DailyBotClient:
+    return DailyBotClient(
+        api_url="http://test-api.example.com",
+        token="test-token",
+        api_key="test-api-key",
+    )
+
+
+class TestDailyBotClientAuth:
+
+    def test_request_code(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"detail": "Code sent"}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            result: dict[str, Any] = client.request_code("user@example.com")
+
+        mock_post.assert_called_once()
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"] == {"email": "user@example.com"}
+        assert result["detail"] == "Code sent"
+
+    def test_verify_code(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"token": "new-token", "organization": "Org"}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            result: dict[str, Any] = client.verify_code("user@example.com", "123456")
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"]["email"] == "user@example.com"
+        assert call_kwargs["json"]["code"] == "123456"
+        assert result["token"] == "new-token"
+
+    def test_verify_code_with_org_id(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"token": "new-token"}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            client.verify_code("user@example.com", "123456", organization_id=42)
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"]["organization_id"] == 42
+
+    def test_auth_status(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"email": "user@example.com"}
+
+        with patch("httpx.get", return_value=mock_response) as mock_get:
+            result: dict[str, Any] = client.auth_status()
+
+        call_kwargs: dict[str, Any] = mock_get.call_args[1]
+        assert "Bearer test-token" in call_kwargs["headers"]["Authorization"]
+        assert result["email"] == "user@example.com"
+
+    def test_logout(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"detail": "Logged out"}
+
+        with patch("httpx.post", return_value=mock_response):
+            result: dict[str, Any] = client.logout()
+
+        assert result["detail"] == "Logged out"
+
+
+class TestDailyBotClientUpdates:
+
+    def test_submit_update_message(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"followups_count": 1}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            result: dict[str, Any] = client.submit_update(message="Did stuff")
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"] == {"message": "Did stuff"}
+        assert result["followups_count"] == 1
+
+    def test_submit_update_structured(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"followups_count": 1}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            result: dict[str, Any] = client.submit_update(
+                done="Auth", doing="Tests", blocked="None"
+            )
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"]["done"] == "Auth"
+        assert call_kwargs["json"]["doing"] == "Tests"
+        assert call_kwargs["json"]["blocked"] == "None"
+
+    def test_get_status(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"count": 1, "pending_checkins": []}
+
+        with patch("httpx.get", return_value=mock_response):
+            result: dict[str, Any] = client.get_status()
+
+        assert result["count"] == 1
+
+
+class TestDailyBotClientAgent:
+
+    def test_submit_agent_report(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"id": 1, "uuid": "abc"}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            result: dict[str, Any] = client.submit_agent_report(
+                agent_name="Claude Code",
+                content="Deployed v2",
+            )
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"]["agent_name"] == "Claude Code"
+        assert call_kwargs["headers"]["X-API-KEY"] == "test-api-key"
+        assert result["id"] == 1
+
+
+class TestAPIError:
+
+    def test_api_error_raised(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 400
+        mock_response.json.return_value = {"detail": "Bad request"}
+
+        with patch("httpx.post", return_value=mock_response):
+            with pytest.raises(APIError) as exc_info:
+                client.request_code("bad@example.com")
+
+        assert exc_info.value.status_code == 400
+        assert "Bad request" in exc_info.value.detail
+
+    def test_api_error_non_json(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 500
+        mock_response.json.side_effect = ValueError("Not JSON")
+        mock_response.text = "Internal Server Error"
+
+        with patch("httpx.post", return_value=mock_response):
+            with pytest.raises(APIError) as exc_info:
+                client.request_code("user@example.com")
+
+        assert exc_info.value.status_code == 500
+        assert "Internal Server Error" in exc_info.value.detail

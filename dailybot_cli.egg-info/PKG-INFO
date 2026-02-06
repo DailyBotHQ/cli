@@ -1,0 +1,23 @@
+Metadata-Version: 2.4
+Name: dailybot-cli
+Version: 0.1.0
+Summary: DailyBot CLI - Submit check-in updates from your terminal
+Author-email: DailyBot <support@dailybot.com>
+License: MIT
+Project-URL: Homepage, https://www.dailybot.com
+Project-URL: Documentation, https://docs.dailybot.com
+Classifier: Development Status :: 3 - Alpha
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Build Tools
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: click>=8.1.0
+Requires-Dist: httpx>=0.25.0
+Requires-Dist: rich>=13.0.0
