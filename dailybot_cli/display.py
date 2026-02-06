@@ -33,12 +33,18 @@ def print_info(message: str) -> None:
 
 def print_auth_status(data: dict[str, Any]) -> None:
     """Display auth status information."""
+    user_raw: Any = data.get("user", "")
+    email: str = user_raw.get("email", "") if isinstance(user_raw, dict) else str(user_raw or data.get("email", ""))
+    org_raw: Any = data.get("organization", "")
+    org_name: str = org_raw.get("name", "") if isinstance(org_raw, dict) else str(org_raw)
+    org_uuid: str = org_raw.get("uuid", "") if isinstance(org_raw, dict) else ""
     table: Table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="bold")
     table.add_column()
-    table.add_row("Email", str(data.get("email", "")))
-    table.add_row("Organization", str(data.get("organization", "")))
-    table.add_row("Expires", str(data.get("expires_at", "")))
+    table.add_row("Email", email)
+    table.add_row("Organization", org_name)
+    if org_uuid:
+        table.add_row("Org UUID", org_uuid)
     console.print(Panel(table, title="[bold]Auth Status[/bold]", border_style="green"))
 
 

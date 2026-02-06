@@ -15,13 +15,25 @@ from dailybot_cli.display import (
 )
 
 
+def _prompt_org_selection(organizations: list[dict[str, Any]]) -> dict[str, Any]:
+    """Display orgs and prompt the user to pick one."""
+    print_info("You belong to multiple organizations. Please select one:")
+    print_org_selection(organizations)
+    choice: int = click.prompt("Select organization number", type=int)
+    if choice < 1 or choice > len(organizations):
+        print_error("Invalid selection.")
+        raise SystemExit(1)
+    return organizations[choice - 1]
+
+
 def _do_login(email: str) -> None:
-    """Shared login logic used by both 'dailybot login' and 'dailybot login'."""
+    """Shared login logic for 'dailybot login' and interactive mode."""
     client: DailyBotClient = DailyBotClient()
+
     # Step 1: Request OTP code
     try:
         with console.status("Sending verification code..."):
-            client.request_code(email)
+            request_result: dict[str, Any] = client.request_code(email)
     except APIError as e:
         print_error(e.detail)
         raise SystemExit(1)
@@ -29,34 +41,29 @@ def _do_login(email: str) -> None:
     print_success(f"Verification code sent to {email}")
     print_info("Check your inbox (including spam folder).")
 
+    is_multi_org: bool = request_result.get("is_multi_org", False)
+    organizations: list[dict[str, Any]] = request_result.get("organizations", [])
+
+
     # Step 2: Enter code
     code: str = click.prompt("Enter the 6-digit code", type=str)
     code = code.strip()
 
-    # Step 3: Verify code
+    # Step 3: If multi-org, prompt for org selection before verifying
+    organization_id: Optional[int] = None
+    if is_multi_org and len(organizations) > 1:
+        selected_org: dict[str, Any] = _prompt_org_selection(organizations)
+        organization_id = selected_org["id"]
+    elif len(organizations) == 1:
+        organization_id = organizations[0].get("id")
+
+    # Step 4: Verify code (with org_id already resolved)
     try:
         with console.status("Verifying code..."):
-            result: dict[str, Any] = client.verify_code(email, code)
+            result: dict[str, Any] = client.verify_code(email, code, organization_id=organization_id)
     except APIError as e:
         print_error(e.detail)
         raise SystemExit(1)
-
-    # Step 4: Handle multi-org
-    if result.get("organization_selection_required"):
-        organizations: list[dict[str, Any]] = result.get("organizations", [])
-        print_info("You belong to multiple organizations. Please select one:")
-        print_org_selection(organizations)
-        choice: int = click.prompt("Select organization number", type=int)
-        if choice < 1 or choice > len(organizations):
-            print_error("Invalid selection.")
-            raise SystemExit(1)
-        selected_org: dict[str, Any] = organizations[choice - 1]
-        try:
-            with console.status("Verifying..."):
-                result = client.verify_code(email, code, organization_id=selected_org["id"])
-        except APIError as e:
-            print_error(e.detail)
-            raise SystemExit(1)
 
     # Step 5: Save credentials
     token: Optional[str] = result.get("token")

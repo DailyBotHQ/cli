@@ -54,11 +54,11 @@ class TestVersionAndHelp:
         mock_set_override.assert_called_once_with("https://staging.dailybot.com")
 
 
-class TestLoginShortcut:
+class TestLoginCommand:
 
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     @patch("dailybot_cli.commands.auth.save_credentials")
-    def test_top_level_login(
+    def test_login_single_org(
         self,
         mock_save: MagicMock,
         mock_client_cls: MagicMock,
@@ -66,11 +66,16 @@ class TestLoginShortcut:
     ) -> None:
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.api_url = "https://api.dailybot.com"
-        mock_client.request_code.return_value = {"detail": "Code sent"}
+        mock_client.request_code.return_value = {
+            "detail": "Verification code sent to your email.",
+            "organizations": [{"id": 1, "name": "MyOrg", "uuid": "org-uuid-456"}],
+            "is_multi_org": False,
+        }
         mock_client.verify_code.return_value = {
+            "requires_organization_selection": False,
             "token": "tok123",
-            "organization": "MyOrg",
-            "organization_uuid": "org-uuid-456",
+            "user": {"email": "user@test.com"},
+            "organization": {"id": 1, "name": "MyOrg", "uuid": "org-uuid-456"},
         }
 
         result = runner.invoke(cli, ["login"], input="user@test.com\n123456\n")
@@ -78,6 +83,53 @@ class TestLoginShortcut:
         assert "Logged in" in result.output
         assert "MyOrg" in result.output
         mock_save.assert_called_once()
+        # Single-org: verify is called once with organization_id
+        mock_client.verify_code.assert_called_once_with("user@test.com", "123456", organization_id=1)
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    @patch("dailybot_cli.commands.auth.save_credentials")
+    def test_login_multi_org(
+        self,
+        mock_save: MagicMock,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.request_code.return_value = {
+            "detail": "Verification code sent to your email.",
+            "organizations": [
+                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+                {"id": 2, "name": "Side Project", "uuid": "def-456"},
+            ],
+            "is_multi_org": True,
+        }
+        mock_client.verify_code.return_value = {
+            "requires_organization_selection": False,
+            "token": "tok456",
+            "user": {"email": "user@test.com"},
+            "organization": {"id": 2, "name": "Side Project", "uuid": "def-456"},
+        }
+
+        # Enter email, code, then select org #2
+        result = runner.invoke(cli, ["login"], input="user@test.com\n123456\n2\n")
+        assert result.exit_code == 0
+        assert "Logged in" in result.output
+        assert "Side Project" in result.output
+        # Org selected before verify — single call with org_id
+        mock_client.verify_code.assert_called_once_with("user@test.com", "123456", organization_id=2)
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    def test_login_bad_email(
+        self, mock_client_cls: MagicMock, runner: CliRunner
+    ) -> None:
+        from dailybot_cli.api_client import APIError
+
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.request_code.side_effect = APIError(400, "No account found")
+
+        result = runner.invoke(cli, ["login"], input="bad@test.com\n")
+        assert result.exit_code != 0
 
 
 class TestLogoutCommand:
@@ -248,39 +300,28 @@ class TestStatusCommand:
 class TestInteractiveLogin:
 
     @patch("dailybot_cli.commands.interactive.questionary")
-    @patch("dailybot_cli.commands.interactive.DailyBotClient")
-    @patch("dailybot_cli.commands.interactive.save_credentials")
+    @patch("dailybot_cli.commands.interactive._do_login")
     @patch("dailybot_cli.commands.interactive.load_credentials")
     @patch("dailybot_cli.commands.interactive.get_token")
     def test_interactive_guides_login_when_not_authenticated(
         self,
         mock_get_token: MagicMock,
         mock_load_creds: MagicMock,
-        mock_save: MagicMock,
-        mock_client_cls: MagicMock,
+        mock_do_login: MagicMock,
         mock_questionary: MagicMock,
         runner: CliRunner,
     ) -> None:
-        # First call: not logged in; second call (after login): return creds
+        # First call: not logged in; second call (after _do_login): return creds
         mock_get_token.return_value = None
         mock_load_creds.side_effect = [
             None,
             {"token": "tok", "email": "u@t.com", "organization": "Org"},
         ]
-        mock_client: MagicMock = mock_client_cls.return_value
-        mock_client.api_url = "https://api.dailybot.com"
-        mock_client.request_code.return_value = {}
-        mock_client.verify_code.return_value = {
-            "token": "tok",
-            "organization": "Org",
-            "organization_uuid": "uuid-1",
-        }
         # Mock questionary.select to return "Quit"
         mock_questionary.select.return_value.ask.return_value = "Quit"
-        # Provide email and OTP code for the login flow
-        result = runner.invoke(cli, [], input="u@t.com\n123456\n")
-        assert "Logged in" in result.output
-        mock_save.assert_called_once()
+        # Provide email for the prompt (code is handled inside _do_login which is mocked)
+        result = runner.invoke(cli, [], input="u@t.com\n")
+        mock_do_login.assert_called_once_with("u@t.com")
 
 
 class TestAgentCommand:
