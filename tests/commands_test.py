@@ -86,22 +86,25 @@ class TestLoginCommand:
         # Single-org: verify is called once with organization_id
         mock_client.verify_code.assert_called_once_with("user@test.com", "123456", organization_id=1)
 
+    @patch("dailybot_cli.commands.auth.questionary")
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     @patch("dailybot_cli.commands.auth.save_credentials")
     def test_login_multi_org(
         self,
         mock_save: MagicMock,
         mock_client_cls: MagicMock,
+        mock_questionary: MagicMock,
         runner: CliRunner,
     ) -> None:
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.api_url = "https://api.dailybot.com"
+        orgs = [
+            {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+            {"id": 2, "name": "Side Project", "uuid": "def-456"},
+        ]
         mock_client.request_code.return_value = {
             "detail": "Verification code sent to your email.",
-            "organizations": [
-                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
-                {"id": 2, "name": "Side Project", "uuid": "def-456"},
-            ],
+            "organizations": orgs,
             "is_multi_org": True,
         }
         mock_client.verify_code.return_value = {
@@ -110,9 +113,11 @@ class TestLoginCommand:
             "user": {"email": "user@test.com"},
             "organization": {"id": 2, "name": "Side Project", "uuid": "def-456"},
         }
+        # Mock questionary.select to return the second org
+        mock_questionary.select.return_value.ask.return_value = orgs[1]
 
-        # Enter email, code, then select org #2
-        result = runner.invoke(cli, ["login"], input="user@test.com\n123456\n2\n")
+        # Enter email, code (org selection handled by questionary mock)
+        result = runner.invoke(cli, ["login"], input="user@test.com\n123456\n")
         assert result.exit_code == 0
         assert "Logged in" in result.output
         assert "Side Project" in result.output
@@ -248,6 +253,21 @@ class TestUpdateCommand:
         assert result.exit_code != 0
         assert "could not process" in result.output
         assert "support@dailybot.com" in result.output
+
+    @patch("dailybot_cli.commands.update.get_token")
+    @patch("dailybot_cli.commands.update.DailyBotClient")
+    def test_update_timeout(
+        self, mock_client_cls: MagicMock, mock_get_token: MagicMock, runner: CliRunner
+    ) -> None:
+        import httpx
+
+        mock_get_token.return_value = "tok"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_update.side_effect = httpx.ReadTimeout("timed out")
+
+        result = runner.invoke(cli, ["update", "test"])
+        assert result.exit_code != 0
+        assert "timed out" in result.output
 
     @patch("dailybot_cli.commands.update.get_token")
     def test_update_not_logged_in(

@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 import click
+import questionary
 
 from dailybot_cli.api_client import APIError, DailyBotClient
 from dailybot_cli.config import clear_credentials, get_token, save_credentials
@@ -10,20 +11,24 @@ from dailybot_cli.display import (
     console,
     print_error,
     print_info,
-    print_org_selection,
     print_success,
 )
 
 
 def _prompt_org_selection(organizations: list[dict[str, Any]]) -> dict[str, Any]:
     """Display orgs and prompt the user to pick one."""
-    print_info("You belong to multiple organizations. Please select one:")
-    print_org_selection(organizations)
-    choice: int = click.prompt("Select organization number", type=int)
-    if choice < 1 or choice > len(organizations):
-        print_error("Invalid selection.")
+    choices: list[questionary.Choice] = [
+        questionary.Choice(title=org.get("name", "Unknown"), value=org)
+        for org in organizations
+    ]
+    selected: Optional[dict[str, Any]] = questionary.select(
+        "You belong to multiple organizations. Select one:",
+        choices=choices,
+    ).ask()
+    if selected is None:
+        print_error("No organization selected.")
         raise SystemExit(1)
-    return organizations[choice - 1]
+    return selected
 
 
 def _do_login(email: str) -> None:

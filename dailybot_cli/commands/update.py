@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 import click
+import httpx
 
 from dailybot_cli.api_client import APIError, DailyBotClient
 from dailybot_cli.config import get_token
@@ -71,6 +72,12 @@ def update(
                 blocked=blocked,
             )
         print_update_result(result)
+    except httpx.TimeoutException:
+        print_error(
+            "The request timed out. DailyBot may be processing your update — "
+            "please check your check-ins before retrying."
+        )
+        raise SystemExit(1)
     except APIError as e:
         if e.status_code in (401, 403):
             print_error("Session expired. Please log in again: dailybot login")

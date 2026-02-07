@@ -135,7 +135,7 @@ class DailyBotClient:
             f"{self.api_url}/v1/cli/updates/",
             json=payload,
             headers=self._headers(),
-            timeout=self.timeout,
+            timeout=120.0,
         )
         return self._handle_response(response)
 

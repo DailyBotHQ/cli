@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 import click
+import httpx
 import questionary
 
 from dailybot_cli.api_client import APIError, DailyBotClient
@@ -97,6 +98,11 @@ def _send_update(client: DailyBotClient) -> None:
         with console.status("Submitting update..."):
             result: dict[str, Any] = client.submit_update(message=message)
         print_update_result(result)
+    except httpx.TimeoutException:
+        print_error(
+            "The request timed out. DailyBot may be processing your update — "
+            "please check your check-ins before retrying."
+        )
     except APIError as e:
         print_error(e.detail)
 

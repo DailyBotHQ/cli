@@ -89,12 +89,3 @@ def print_update_result(data: dict[str, Any]) -> None:
         console.print(f"  [dim]-[/dim] {name} [dim]({label})[/dim]")
 
 
-def print_org_selection(organizations: list[dict[str, Any]]) -> None:
-    """Display organization selection list."""
-    table: Table = Table(show_header=True, box=None)
-    table.add_column("#", style="bold")
-    table.add_column("Organization")
-    table.add_column("UUID", style="dim")
-    for i, org in enumerate(organizations, 1):
-        table.add_row(str(i), str(org.get("name", "")), str(org.get("uuid", "")))
-    console.print(table)
