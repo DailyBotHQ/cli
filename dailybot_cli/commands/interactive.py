@@ -1,5 +1,6 @@
 """Interactive mode for DailyBot CLI."""
 
+import readline  # noqa: F401 — enables arrow-key editing in input()
 from typing import Any, Optional
 
 import click
