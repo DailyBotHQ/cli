@@ -29,7 +29,9 @@ def cli(ctx: click.Context, api_url: Optional[str]) -> None:
 
     \b
     Agent mode (requires DAILYBOT_API_KEY env var):
+      Progress updates, health reporting, and messaging.
       dailybot agent update "Deployed v2.1" --name "My Agent"
+      dailybot agent --help
 
     Run without arguments for interactive mode.
     """

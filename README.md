@@ -53,6 +53,27 @@ dailybot agent update "Built feature X" --name "Claude Code"
 
 # Include structured data
 dailybot agent update "Tests passed" --name "CI Bot" --json-data '{"suite": "integration", "passed": 42}'
+
+# Report agent health
+dailybot agent health --ok --message "All systems go" --name "Claude Code"
+dailybot agent health --fail --message "DB unreachable" --name "CI Bot"
+
+# Check agent health status
+dailybot agent health --status --name "Claude Code"
+
+# Register a webhook to receive messages
+dailybot agent webhook register --url https://my-server.com/hook --secret my-token --name "Claude Code"
+
+# Unregister a webhook
+dailybot agent webhook unregister --name "Claude Code"
+
+# Send a message to an agent
+dailybot agent message send --to "Claude Code" --content "Review PR #42"
+dailybot agent message send --to "Claude Code" --content "Do X" --type command
+
+# List messages for an agent
+dailybot agent message list --name "Claude Code"
+dailybot agent message list --name "Claude Code" --pending
 ```
 
 ## Commands
@@ -64,6 +85,11 @@ dailybot agent update "Tests passed" --name "CI Bot" --json-data '{"suite": "int
 | `dailybot status` | Show pending check-ins for today |
 | `dailybot update` | Submit a check-in update (free-text or structured) |
 | `dailybot agent update` | Submit an agent activity report (API key) |
+| `dailybot agent health` | Report or query agent health status (API key) |
+| `dailybot agent webhook register` | Register a webhook for the agent (API key) |
+| `dailybot agent webhook unregister` | Unregister the agent's webhook (API key) |
+| `dailybot agent message send` | Send a message to an agent (API key) |
+| `dailybot agent message list` | List messages for an agent (API key) |
 
 Run `dailybot --help` for full details on any command.
 

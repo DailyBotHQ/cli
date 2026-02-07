@@ -31,6 +31,20 @@ def print_info(message: str) -> None:
     console.print(f"[dim]{message}[/dim]")
 
 
+def _format_sender(msg: dict[str, Any]) -> str:
+    """Format sender prefix for a message: [type] name: or [type]:
+
+    Brackets are escaped for Rich markup (\\[ renders as literal [).
+    """
+    sender_type: str = msg.get("sender_type", "")
+    sender_name: str = msg.get("sender_name") or ""
+    if sender_name:
+        return f"\\[{sender_type}] {sender_name}:"
+    if sender_type:
+        return f"\\[{sender_type}]:"
+    return ""
+
+
 def print_auth_status(data: dict[str, Any]) -> None:
     """Display auth status information."""
     user_raw: Any = data.get("user", "")
@@ -72,6 +86,102 @@ def print_pending_checkins(checkins: list[dict[str, Any]]) -> None:
                 border_style="cyan",
             )
         )
+
+
+def print_agent_health(data: dict[str, Any]) -> None:
+    """Display agent health status."""
+    agent_name: str = data.get("agent_name", "Unknown")
+    status: str = data.get("status", "unknown")
+    last_check: str = data.get("last_check", "N/A")
+
+    style: str = "green" if status == "healthy" else "red" if status == "unhealthy" else "yellow"
+    status_display: str = f"[bold {style}]{status}[/bold {style}]"
+
+    table: Table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("Agent", agent_name)
+    table.add_row("Status", status_display)
+    table.add_row("Last Check", last_check)
+    console.print(Panel(table, title="[bold]Agent Health[/bold]", border_style=style))
+
+    history: list[dict[str, Any]] = data.get("history", [])
+    if history:
+        hist_table: Table = Table(title="Recent History", border_style="dim")
+        hist_table.add_column("Timestamp", style="dim")
+        hist_table.add_column("Status")
+        hist_table.add_column("Message")
+        for entry in history:
+            entry_status: str = entry.get("status", "")
+            entry_style: str = "green" if entry_status == "healthy" else "red"
+            hist_table.add_row(
+                entry.get("timestamp", ""),
+                Text(entry_status, style=entry_style),
+                entry.get("message", ""),
+            )
+        console.print(hist_table)
+
+    pending: list[dict[str, Any]] = data.get("pending_messages", [])
+    if pending:
+        console.print(f"\n[bold]Pending messages ({len(pending)}):[/bold]")
+        for msg in pending:
+            sender: str = _format_sender(msg)
+            content: str = msg.get("content", "")
+            created: str = msg.get("created_at", "")
+            if sender:
+                console.print(f"  [dim]{sender}[/dim] {content} [dim]({created})[/dim]")
+            else:
+                console.print(f"  {content} [dim]({created})[/dim]")
+
+
+def print_webhook_result(data: dict[str, Any]) -> None:
+    """Display webhook registration result."""
+    table: Table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("Agent", data.get("agent_name", ""))
+    table.add_row("Webhook URL", data.get("webhook_url", ""))
+    console.print(Panel(table, title="[bold]Webhook Registered[/bold]", border_style="green"))
+
+
+def print_agent_messages(messages: list[dict[str, Any]]) -> None:
+    """Display a list of agent messages."""
+    if not messages:
+        print_info("No messages found.")
+        return
+    table: Table = Table(title="Agent Messages", border_style="cyan")
+    table.add_column("Type", style="dim")
+    table.add_column("Sender")
+    table.add_column("Content")
+    table.add_column("Delivered")
+    table.add_column("Created", style="dim")
+    for msg in messages:
+        delivered: bool = msg.get("delivered", False)
+        delivered_text: str = "[green]yes[/green]" if delivered else "[yellow]no[/yellow]"
+        sender_type: str = msg.get("sender_type", "")
+        sender_name: str = msg.get("sender_name") or ""
+        sender_display: str = f"{sender_name} ({sender_type})" if sender_name else sender_type
+        table.add_row(
+            msg.get("message_type", "text"),
+            sender_display,
+            msg.get("content", ""),
+            delivered_text,
+            msg.get("created_at", ""),
+        )
+    console.print(table)
+
+
+def print_agent_message_sent(data: dict[str, Any]) -> None:
+    """Display the result of sending an agent message."""
+    table: Table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("ID", data.get("id", "N/A"))
+    table.add_row("To", data.get("agent_name", ""))
+    table.add_row("From", data.get("sender_name") or data.get("sender_type", ""))
+    table.add_row("Type", data.get("message_type", "text"))
+    table.add_row("Content", data.get("content", ""))
+    console.print(Panel(table, title="[bold]Message Sent[/bold]", border_style="green"))
 
 
 def print_update_result(data: dict[str, Any]) -> None:

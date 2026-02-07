@@ -173,3 +173,122 @@ class DailyBotClient:
             timeout=self.timeout,
         )
         return self._handle_response(response)
+
+    def submit_agent_health(
+        self,
+        agent_name: str,
+        ok: bool,
+        message: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """POST /v1/agent-health/"""
+        payload: dict[str, Any] = {
+            "agent_name": agent_name,
+            "ok": ok,
+        }
+        if message:
+            payload["message"] = message
+        response: httpx.Response = httpx.post(
+            f"{self.api_url}/v1/agent-health/",
+            json=payload,
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
+    def get_agent_health(self, agent_name: str) -> dict[str, Any]:
+        """GET /v1/agent-health/?agent_name=..."""
+        response: httpx.Response = httpx.get(
+            f"{self.api_url}/v1/agent-health/",
+            params={"agent_name": agent_name},
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
+    # --- Agent webhook endpoints ---
+
+    def register_agent_webhook(
+        self,
+        agent_name: str,
+        webhook_url: str,
+        webhook_secret: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """POST /v1/agent-webhook/"""
+        payload: dict[str, Any] = {
+            "agent_name": agent_name,
+            "webhook_url": webhook_url,
+        }
+        if webhook_secret:
+            payload["webhook_secret"] = webhook_secret
+        response: httpx.Response = httpx.post(
+            f"{self.api_url}/v1/agent-webhook/",
+            json=payload,
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
+    def unregister_agent_webhook(self, agent_name: str) -> dict[str, Any]:
+        """DELETE /v1/agent-webhook/"""
+        response: httpx.Response = httpx.request(
+            "DELETE",
+            f"{self.api_url}/v1/agent-webhook/",
+            json={"agent_name": agent_name},
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
+    # --- Agent message endpoints ---
+
+    def send_agent_message(
+        self,
+        agent_name: str,
+        content: str,
+        message_type: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        expires_at: Optional[str] = None,
+        sender_type: Optional[str] = None,
+        sender_name: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """POST /v1/agent-messages/"""
+        payload: dict[str, Any] = {
+            "agent_name": agent_name,
+            "content": content,
+        }
+        if message_type:
+            payload["message_type"] = message_type
+        if metadata:
+            payload["metadata"] = metadata
+        if expires_at:
+            payload["expires_at"] = expires_at
+        if sender_type:
+            payload["sender_type"] = sender_type
+        if sender_name:
+            payload["sender_name"] = sender_name
+        response: httpx.Response = httpx.post(
+            f"{self.api_url}/v1/agent-messages/",
+            json=payload,
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
+    def get_agent_messages(
+        self,
+        agent_name: str,
+        delivered: Optional[bool] = None,
+    ) -> list[dict[str, Any]]:
+        """GET /v1/agent-messages/?agent_name=..."""
+        params: dict[str, str] = {"agent_name": agent_name}
+        if delivered is not None:
+            params["delivered"] = "true" if delivered else "false"
+        response: httpx.Response = httpx.get(
+            f"{self.api_url}/v1/agent-messages/",
+            params=params,
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        if response.status_code >= 400:
+            self._handle_response(response)
+        return response.json()  # type: ignore[no-any-return]
