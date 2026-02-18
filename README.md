@@ -40,9 +40,22 @@ Run `dailybot` with no arguments to enter **interactive mode** — if you're not
 
 ## For agents
 
-Any software agent — AI coding assistants, CI jobs, deploy scripts, bots — can report activity through the CLI using an API key. This lets teams get visibility into what automated processes are doing, alongside human updates.
+Any software agent — AI coding assistants, CI jobs, deploy scripts, bots — can report activity through the CLI. This lets teams get visibility into what automated processes are doing, alongside human updates.
 
-Set the `DAILYBOT_API_KEY` environment variable, then:
+Authenticate with any of these methods (checked in this order):
+
+```bash
+# Option 1: Environment variable (CI pipelines, one-off scripts)
+export DAILYBOT_API_KEY=your-key
+
+# Option 2: Store the key on disk (recommended for dev machines)
+dailybot config key=your-key
+
+# Option 3: Use your login session (no API key needed)
+dailybot login
+```
+
+Then run agent commands:
 
 ```bash
 # Report a deployment
@@ -84,12 +97,13 @@ dailybot agent message list --name "Claude Code" --pending
 | `dailybot logout` | Log out and revoke token |
 | `dailybot status` | Show pending check-ins for today |
 | `dailybot update` | Submit a check-in update (free-text or structured) |
-| `dailybot agent update` | Submit an agent activity report (API key) |
-| `dailybot agent health` | Report or query agent health status (API key) |
-| `dailybot agent webhook register` | Register a webhook for the agent (API key) |
-| `dailybot agent webhook unregister` | Unregister the agent's webhook (API key) |
-| `dailybot agent message send` | Send a message to an agent (API key) |
-| `dailybot agent message list` | List messages for an agent (API key) |
+| `dailybot config` | Get, set, or remove a stored setting (e.g. API key) |
+| `dailybot agent update` | Submit an agent activity report (API key or login) |
+| `dailybot agent health` | Report or query agent health status (API key or login) |
+| `dailybot agent webhook register` | Register a webhook for the agent (API key or login) |
+| `dailybot agent webhook unregister` | Unregister the agent's webhook (API key or login) |
+| `dailybot agent message send` | Send a message to an agent (API key or login) |
+| `dailybot agent message list` | List messages for an agent (API key or login) |
 
 Run `dailybot --help` for full details on any command.
 

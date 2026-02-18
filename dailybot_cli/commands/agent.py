@@ -5,7 +5,7 @@ from typing import Any, Optional
 import click
 
 from dailybot_cli.api_client import APIError, DailyBotClient
-from dailybot_cli.config import get_api_key
+from dailybot_cli.config import get_agent_auth
 from dailybot_cli.display import (
     console,
     print_agent_health,
@@ -17,9 +17,17 @@ from dailybot_cli.display import (
 )
 
 
+_NO_AUTH_MSG: str = (
+    "No authentication found. Use one of:\n"
+    "  - DAILYBOT_API_KEY environment variable\n"
+    "  - dailybot config key=<KEY>\n"
+    "  - dailybot login"
+)
+
+
 @click.group()
 def agent() -> None:
-    """Agent commands (requires DAILYBOT_API_KEY)."""
+    """Agent commands (requires API key or login session)."""
     pass
 
 
@@ -34,9 +42,8 @@ def agent_update(content: str, name: str, json_data: Optional[str]) -> None:
       DAILYBOT_API_KEY=xxx dailybot agent update "Deployed v2.1 to staging"
       DAILYBOT_API_KEY=xxx dailybot agent update "Built feature X" --name "Claude Code"
     """
-    api_key: Optional[str] = get_api_key()
-    if not api_key:
-        print_error("DAILYBOT_API_KEY environment variable is required for agent commands.")
+    if not get_agent_auth():
+        print_error(_NO_AUTH_MSG)
         raise SystemExit(1)
 
     structured: Optional[dict[str, Any]] = None
@@ -88,9 +95,8 @@ def agent_health(
         print_error("Specify exactly one of --ok, --fail, or --status.")
         raise SystemExit(1)
 
-    api_key: Optional[str] = get_api_key()
-    if not api_key:
-        print_error("DAILYBOT_API_KEY environment variable is required for agent commands.")
+    if not get_agent_auth():
+        print_error(_NO_AUTH_MSG)
         raise SystemExit(1)
 
     client: DailyBotClient = DailyBotClient()
@@ -132,9 +138,8 @@ def webhook_register(url: str, secret: Optional[str], name: str) -> None:
       DAILYBOT_API_KEY=xxx dailybot agent webhook register --url https://my-server.com/hook
       DAILYBOT_API_KEY=xxx dailybot agent webhook register --url https://... --secret my-token
     """
-    api_key: Optional[str] = get_api_key()
-    if not api_key:
-        print_error("DAILYBOT_API_KEY environment variable is required for agent commands.")
+    if not get_agent_auth():
+        print_error(_NO_AUTH_MSG)
         raise SystemExit(1)
 
     client: DailyBotClient = DailyBotClient()
@@ -160,9 +165,8 @@ def webhook_unregister(name: str) -> None:
       DAILYBOT_API_KEY=xxx dailybot agent webhook unregister
       DAILYBOT_API_KEY=xxx dailybot agent webhook unregister --name "Claude Code"
     """
-    api_key: Optional[str] = get_api_key()
-    if not api_key:
-        print_error("DAILYBOT_API_KEY environment variable is required for agent commands.")
+    if not get_agent_auth():
+        print_error(_NO_AUTH_MSG)
         raise SystemExit(1)
 
     client: DailyBotClient = DailyBotClient()
@@ -205,9 +209,8 @@ def message_send(
       DAILYBOT_API_KEY=xxx dailybot agent message send --to "Claude Code" --content "Review PR #42"
       DAILYBOT_API_KEY=xxx dailybot agent message send --to "Claude Code" --content "Do X" --type command
     """
-    api_key: Optional[str] = get_api_key()
-    if not api_key:
-        print_error("DAILYBOT_API_KEY environment variable is required for agent commands.")
+    if not get_agent_auth():
+        print_error(_NO_AUTH_MSG)
         raise SystemExit(1)
 
     metadata: Optional[dict[str, Any]] = None
@@ -248,9 +251,8 @@ def message_list(name: str, pending: bool) -> None:
       DAILYBOT_API_KEY=xxx dailybot agent message list --name "Claude Code"
       DAILYBOT_API_KEY=xxx dailybot agent message list --name "Claude Code" --pending
     """
-    api_key: Optional[str] = get_api_key()
-    if not api_key:
-        print_error("DAILYBOT_API_KEY environment variable is required for agent commands.")
+    if not get_agent_auth():
+        print_error(_NO_AUTH_MSG)
         raise SystemExit(1)
 
     delivered: Optional[bool] = False if pending else None

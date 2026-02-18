@@ -30,6 +30,7 @@ class DailyBotClient:
         self.token: Optional[str] = token or get_token()
         self.api_key: Optional[str] = api_key or get_api_key()
         self.timeout: float = timeout
+        self._agent_auth_mode: Optional[str] = None
 
     def _headers(self, authenticated: bool = True) -> dict[str, str]:
         """Build request headers."""
@@ -42,13 +43,19 @@ class DailyBotClient:
         return headers
 
     def _agent_headers(self) -> dict[str, str]:
-        """Build headers for agent API key authentication."""
+        """Build headers for agent authentication (API key preferred, then Bearer)."""
         headers: dict[str, str] = {
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
         if self.api_key:
             headers["X-API-KEY"] = self.api_key
+            self._agent_auth_mode = "api_key"
+        elif self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+            self._agent_auth_mode = "bearer"
+        else:
+            self._agent_auth_mode = None
         return headers
 
     def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
@@ -59,6 +66,8 @@ class DailyBotClient:
                 detail: str = body.get("detail", body.get("error", str(body)))
             except Exception:
                 detail = response.text or f"HTTP {response.status_code}"
+            if response.status_code in (401, 403) and self._agent_auth_mode == "bearer":
+                detail = "Session expired. Run 'dailybot login' to re-authenticate."
             raise APIError(status_code=response.status_code, detail=detail)
         if response.status_code == 204:
             return {}

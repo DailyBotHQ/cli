@@ -16,6 +16,7 @@ def set_api_url_override(url: str) -> None:
     _api_url_override = url.rstrip("/")
 CONFIG_DIR: Path = Path.home() / ".config" / "dailybot"
 CREDENTIALS_FILE: Path = CONFIG_DIR / "credentials.json"
+CONFIG_FILE: Path = CONFIG_DIR / "config.json"
 
 
 def get_config_dir() -> Path:
@@ -90,6 +91,46 @@ def get_token() -> Optional[str]:
     return None
 
 
+def load_config() -> dict[str, Any]:
+    """Read config.json, return {} if missing."""
+    if not CONFIG_FILE.exists():
+        return {}
+    try:
+        return json.loads(CONFIG_FILE.read_text())
+    except (json.JSONDecodeError, KeyError):
+        return {}
+
+
+def save_config(data: dict[str, Any]) -> None:
+    """Merge *data* into existing config. Keys set to None are removed."""
+    existing: dict[str, Any] = load_config()
+    for key, value in data.items():
+        if value is None:
+            existing.pop(key, None)
+        else:
+            existing[key] = value
+    get_config_dir()
+    CONFIG_FILE.write_text(json.dumps(existing, indent=2))
+    os.chmod(CONFIG_FILE, 0o600)
+
+
 def get_api_key() -> Optional[str]:
-    """Return the org API key from environment (for agent mode)."""
-    return os.environ.get("DAILYBOT_API_KEY")
+    """Return the org API key (env var > stored config > None)."""
+    env_key: Optional[str] = os.environ.get("DAILYBOT_API_KEY")
+    if env_key:
+        return env_key
+    config: dict[str, Any] = load_config()
+    return config.get("api_key") or None
+
+
+def get_agent_auth() -> Optional[str]:
+    """Return the auth mode available for agent commands.
+
+    Returns ``"api_key"`` if an API key is available (env or config),
+    ``"bearer"`` if a login token exists, or ``None``.
+    """
+    if get_api_key():
+        return "api_key"
+    if get_token():
+        return "bearer"
+    return None

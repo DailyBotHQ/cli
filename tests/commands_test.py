@@ -1,5 +1,6 @@
 """Tests for CLI commands."""
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -346,12 +347,12 @@ class TestInteractiveLogin:
 
 class TestAgentCommand:
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_update(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.submit_agent_report.return_value = {"id": 1, "uuid": "abc"}
 
@@ -361,20 +362,20 @@ class TestAgentCommand:
         assert result.exit_code == 0
         assert "Report submitted" in result.output
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_update_no_api_key(
-        self, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = None
+        mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "update", "test"])
         assert result.exit_code != 0
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_health_ok(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.submit_agent_health.return_value = {
             "agent_name": "Claude Code",
@@ -393,12 +394,12 @@ class TestAgentCommand:
             agent_name="Claude Code", ok=True, message="All good"
         )
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_health_fail(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.submit_agent_health.return_value = {
             "agent_name": "CI Bot",
@@ -417,12 +418,12 @@ class TestAgentCommand:
             agent_name="CI Bot", ok=False, message="DB down"
         )
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_health_status(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.get_agent_health.return_value = {
             "agent_name": "Claude Code",
@@ -441,11 +442,11 @@ class TestAgentCommand:
         assert "Claude Code" in result.output
         mock_client.get_agent_health.assert_called_once_with(agent_name="Claude Code")
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_health_no_api_key(
-        self, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = None
+        mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "health", "--ok"])
         assert result.exit_code != 0
 
@@ -453,12 +454,12 @@ class TestAgentCommand:
         result = runner.invoke(cli, ["agent", "health"])
         assert result.exit_code != 0
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_health_with_pending_messages(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.submit_agent_health.return_value = {
             "agent_name": "Claude Code",
@@ -497,12 +498,12 @@ class TestAgentCommand:
 
     # --- Webhook tests ---
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_webhook_register(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.register_agent_webhook.return_value = {
             "agent_name": "Claude Code",
@@ -523,12 +524,12 @@ class TestAgentCommand:
             webhook_secret="my-token",
         )
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_webhook_unregister(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.unregister_agent_webhook.return_value = {
             "detail": "Webhook unregistered.",
@@ -540,32 +541,32 @@ class TestAgentCommand:
         assert result.exit_code == 0
         assert "Webhook unregistered" in result.output
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_webhook_register_no_api_key(
-        self, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = None
+        mock_get_auth.return_value = None
         result = runner.invoke(
             cli, ["agent", "webhook", "register", "--url", "https://example.com/hook"]
         )
         assert result.exit_code != 0
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_webhook_unregister_no_api_key(
-        self, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = None
+        mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "webhook", "unregister"])
         assert result.exit_code != 0
 
     # --- Message tests ---
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_message_send(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.send_agent_message.return_value = {
             "id": "msg-uuid",
@@ -596,12 +597,12 @@ class TestAgentCommand:
             sender_name="CLI Agent",
         )
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_message_send_with_type(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.send_agent_message.return_value = {
             "id": "msg-uuid",
@@ -631,12 +632,12 @@ class TestAgentCommand:
             sender_name="My Bot",
         )
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_message_list(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.get_agent_messages.return_value = [
             {
@@ -671,12 +672,12 @@ class TestAgentCommand:
             agent_name="Claude Code", delivered=None
         )
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_message_list_pending(
-        self, mock_client_cls: MagicMock, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = "apikey123"
+        mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.get_agent_messages.return_value = []
 
@@ -689,20 +690,68 @@ class TestAgentCommand:
             agent_name="Claude Code", delivered=False
         )
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_message_send_no_api_key(
-        self, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = None
+        mock_get_auth.return_value = None
         result = runner.invoke(
             cli, ["agent", "message", "send", "--to", "Bot", "--content", "hi"]
         )
         assert result.exit_code != 0
 
-    @patch("dailybot_cli.commands.agent.get_api_key")
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_message_list_no_api_key(
-        self, mock_get_key: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
-        mock_get_key.return_value = None
+        mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "message", "list", "--name", "Bot"])
         assert result.exit_code != 0
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    def test_agent_no_auth(
+        self, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = None
+        result = runner.invoke(cli, ["agent", "update", "test"])
+        assert result.exit_code != 0
+        assert "dailybot config key=" in result.output
+        assert "dailybot login" in result.output
+
+
+class TestConfigCommand:
+
+    @pytest.fixture(autouse=True)
+    def _tmp_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        config_dir: Path = tmp_path / ".config" / "dailybot"
+        monkeypatch.setattr("dailybot_cli.config.CONFIG_DIR", config_dir)
+        monkeypatch.setattr("dailybot_cli.config.CONFIG_FILE", config_dir / "config.json")
+        monkeypatch.setattr("dailybot_cli.config.CREDENTIALS_FILE", config_dir / "credentials.json")
+
+    def test_config_set_key(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["config", "key=abc123"])
+        assert result.exit_code == 0
+        assert "API key saved" in result.output
+        assert "abc1****" in result.output
+
+    def test_config_show_key(self, runner: CliRunner) -> None:
+        runner.invoke(cli, ["config", "key=secretkey99"])
+        result = runner.invoke(cli, ["config", "key"])
+        assert result.exit_code == 0
+        assert "secr****" in result.output
+
+    def test_config_show_key_not_set(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["config", "key"])
+        assert result.exit_code == 0
+        assert "not set" in result.output
+
+    def test_config_unset_key(self, runner: CliRunner) -> None:
+        runner.invoke(cli, ["config", "key=abc123"])
+        result = runner.invoke(cli, ["config", "key="])
+        assert result.exit_code == 0
+        assert "removed" in result.output
+
+    def test_config_unknown_setting(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["config", "foo=bar"])
+        assert result.exit_code != 0
+        assert "Unknown setting" in result.output

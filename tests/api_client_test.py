@@ -165,3 +165,66 @@ class TestAPIError:
 
         assert exc_info.value.status_code == 500
         assert "Internal Server Error" in exc_info.value.detail
+
+
+class TestAgentDualAuth:
+
+    def test_agent_headers_prefers_api_key(self) -> None:
+        client = DailyBotClient(
+            api_url="http://test.com", token="tok", api_key="key123"
+        )
+        headers = client._agent_headers()
+        assert headers["X-API-KEY"] == "key123"
+        assert "Authorization" not in headers
+        assert client._agent_auth_mode == "api_key"
+
+    def test_agent_headers_falls_back_to_bearer(self) -> None:
+        client = DailyBotClient(
+            api_url="http://test.com", token="tok", api_key=None
+        )
+        headers = client._agent_headers()
+        assert headers["Authorization"] == "Bearer tok"
+        assert "X-API-KEY" not in headers
+        assert client._agent_auth_mode == "bearer"
+
+    @patch("dailybot_cli.api_client.get_token", return_value=None)
+    @patch("dailybot_cli.api_client.get_api_key", return_value=None)
+    def test_agent_headers_no_auth(self, _mock_key: MagicMock, _mock_tok: MagicMock) -> None:
+        client = DailyBotClient(
+            api_url="http://test.com", token=None, api_key=None
+        )
+        headers = client._agent_headers()
+        assert "X-API-KEY" not in headers
+        assert "Authorization" not in headers
+        assert client._agent_auth_mode is None
+
+    def test_handle_response_401_bearer_message(self) -> None:
+        client = DailyBotClient(
+            api_url="http://test.com", token="tok", api_key=None
+        )
+        client._agent_headers()  # sets _agent_auth_mode to "bearer"
+
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 401
+        mock_response.json.return_value = {"detail": "Unauthorized"}
+
+        with pytest.raises(APIError) as exc_info:
+            client._handle_response(mock_response)
+
+        assert "Session expired" in exc_info.value.detail
+        assert "dailybot login" in exc_info.value.detail
+
+    def test_handle_response_401_api_key_unchanged(self) -> None:
+        client = DailyBotClient(
+            api_url="http://test.com", token="tok", api_key="key123"
+        )
+        client._agent_headers()  # sets _agent_auth_mode to "api_key"
+
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 401
+        mock_response.json.return_value = {"detail": "Invalid API key"}
+
+        with pytest.raises(APIError) as exc_info:
+            client._handle_response(mock_response)
+
+        assert exc_info.value.detail == "Invalid API key"

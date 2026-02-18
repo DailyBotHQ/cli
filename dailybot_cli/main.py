@@ -7,6 +7,7 @@ from typing import Optional
 from dailybot_cli import __version__
 from dailybot_cli.commands.agent import agent
 from dailybot_cli.commands.auth import login, logout
+from dailybot_cli.commands.config import config
 from dailybot_cli.commands.interactive import run_interactive
 from dailybot_cli.commands.status import status
 from dailybot_cli.commands.update import update
@@ -28,8 +29,9 @@ def cli(ctx: click.Context, api_url: Optional[str]) -> None:
       dailybot update --done "X" --doing "Y" --blocked "None"
 
     \b
-    Agent mode (requires DAILYBOT_API_KEY env var):
+    Agent mode (API key or login session):
       Progress updates, health reporting, and messaging.
+      dailybot config key=<API_KEY>   # Store API key
       dailybot agent update "Deployed v2.1" --name "My Agent"
       dailybot agent --help
 
@@ -46,6 +48,7 @@ cli.add_command(logout)
 cli.add_command(update)
 cli.add_command(status)
 cli.add_command(agent)
+cli.add_command(config)
 
 
 if __name__ == "__main__":
