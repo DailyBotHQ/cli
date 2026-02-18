@@ -15,6 +15,7 @@ dailybot_cli.egg-info/top_level.txt
 dailybot_cli/commands/__init__.py
 dailybot_cli/commands/agent.py
 dailybot_cli/commands/auth.py
+dailybot_cli/commands/config.py
 dailybot_cli/commands/interactive.py
 dailybot_cli/commands/status.py
 dailybot_cli/commands/update.py
