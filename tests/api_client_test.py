@@ -139,6 +139,54 @@ class TestDailyBotClientAgent:
         assert result["id"] == 1
 
 
+    def test_submit_agent_report_with_milestone(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"id": 2, "is_milestone": True}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            result: dict[str, Any] = client.submit_agent_report(
+                agent_name="Claude Code",
+                content="Big feature",
+                is_milestone=True,
+            )
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"]["is_milestone"] is True
+        assert result["is_milestone"] is True
+
+    def test_submit_agent_report_with_co_authors(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"id": 3, "co_authors": [{"name": "Alice"}]}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            result: dict[str, Any] = client.submit_agent_report(
+                agent_name="Claude Code",
+                content="Paired work",
+                co_authors=["alice@co.com", "bob@co.com"],
+            )
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert call_kwargs["json"]["co_authors"] == ["alice@co.com", "bob@co.com"]
+        assert result["co_authors"] == [{"name": "Alice"}]
+
+    def test_submit_agent_report_defaults_omit_new_fields(self, client: DailyBotClient) -> None:
+        mock_response: MagicMock = MagicMock(spec=httpx.Response)
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"id": 4}
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            client.submit_agent_report(
+                agent_name="Claude Code",
+                content="Normal report",
+            )
+
+        call_kwargs: dict[str, Any] = mock_post.call_args[1]
+        assert "is_milestone" not in call_kwargs["json"]
+        assert "co_authors" not in call_kwargs["json"]
+
+
 class TestAPIError:
 
     def test_api_error_raised(self, client: DailyBotClient) -> None:

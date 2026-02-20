@@ -67,6 +67,16 @@ dailybot agent update "Built feature X" --name "Claude Code"
 # Include structured data
 dailybot agent update "Tests passed" --name "CI Bot" --json-data '{"suite": "integration", "passed": 42}'
 
+# Mark a report as a milestone
+dailybot agent update "Shipped v3.0" --milestone --name "Claude Code"
+
+# Add co-authors (repeatable flag or comma-separated)
+dailybot agent update "Paired on auth refactor" --co-authors alice@co.com --co-authors bob@co.com
+dailybot agent update "Paired on auth refactor" --co-authors "alice@co.com,bob@co.com"
+
+# Combine milestone and co-authors
+dailybot agent update "Launched new dashboard" --milestone --co-authors alice@co.com --name "Claude Code"
+
 # Report agent health
 dailybot agent health --ok --message "All systems go" --name "Claude Code"
 dailybot agent health --fail --message "DB unreachable" --name "CI Bot"
@@ -105,7 +115,22 @@ dailybot agent message list --name "Claude Code" --pending
 | `dailybot agent message send` | Send a message to an agent (API key or login) |
 | `dailybot agent message list` | List messages for an agent (API key or login) |
 
-Run `dailybot --help` for full details on any command.
+### `dailybot agent update`
+
+```
+Usage: dailybot agent update [OPTIONS] CONTENT
+
+  Submit an agent activity report.
+
+Options:
+  -n, --name TEXT        Agent worker name.
+  -j, --json-data TEXT   Structured JSON data to include.
+  -m, --milestone        Mark as a milestone accomplishment.
+  -c, --co-authors TEXT  Co-author email or UUID (repeatable, or comma-separated).
+  --help                 Show this message and exit.
+```
+
+Run `dailybot --help` or `dailybot <command> --help` for full details on any command.
 
 ## Development
 

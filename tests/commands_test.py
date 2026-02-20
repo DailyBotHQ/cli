@@ -709,6 +709,116 @@ class TestAgentCommand:
         assert result.exit_code != 0
 
     @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_agent_update_milestone(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {
+            "id": 10, "is_milestone": True,
+        }
+
+        result = runner.invoke(
+            cli, ["agent", "update", "Big feature", "--milestone"]
+        )
+        assert result.exit_code == 0
+        assert "[Milestone]" in result.output
+        mock_client.submit_agent_report.assert_called_once_with(
+            agent_name="CLI Agent",
+            content="Big feature",
+            structured=None,
+            is_milestone=True,
+            co_authors=None,
+        )
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_agent_update_co_authors(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {
+            "id": 11,
+            "co_authors": [
+                {"name": "Alice", "uuid": "a-uuid"},
+                {"name": "Bob", "uuid": "b-uuid"},
+            ],
+        }
+
+        result = runner.invoke(
+            cli, ["agent", "update", "Paired work",
+                  "--co-authors", "alice@co.com", "--co-authors", "bob@co.com"]
+        )
+        assert result.exit_code == 0
+        assert "Co-authors: Alice, Bob" in result.output
+        mock_client.submit_agent_report.assert_called_once_with(
+            agent_name="CLI Agent",
+            content="Paired work",
+            structured=None,
+            is_milestone=False,
+            co_authors=["alice@co.com", "bob@co.com"],
+        )
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_agent_update_co_authors_comma_separated(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {
+            "id": 12,
+            "co_authors": [
+                {"name": "Alice", "uuid": "a-uuid"},
+                {"name": "Bob", "uuid": "b-uuid"},
+            ],
+        }
+
+        result = runner.invoke(
+            cli, ["agent", "update", "Paired work",
+                  "--co-authors", "alice@co.com,bob@co.com"]
+        )
+        assert result.exit_code == 0
+        assert "Co-authors: Alice, Bob" in result.output
+        mock_client.submit_agent_report.assert_called_once_with(
+            agent_name="CLI Agent",
+            content="Paired work",
+            structured=None,
+            is_milestone=False,
+            co_authors=["alice@co.com", "bob@co.com"],
+        )
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_agent_update_milestone_and_co_authors(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {
+            "id": 13,
+            "is_milestone": True,
+            "co_authors": [{"name": "Alice", "uuid": "a-uuid"}],
+        }
+
+        result = runner.invoke(
+            cli, ["agent", "update", "Big feature", "--milestone",
+                  "--co-authors", "alice@co.com"]
+        )
+        assert result.exit_code == 0
+        assert "[Milestone]" in result.output
+        assert "Co-authors: Alice" in result.output
+        mock_client.submit_agent_report.assert_called_once_with(
+            agent_name="CLI Agent",
+            content="Big feature",
+            structured=None,
+            is_milestone=True,
+            co_authors=["alice@co.com"],
+        )
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_no_auth(
         self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:

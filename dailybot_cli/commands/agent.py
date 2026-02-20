@@ -35,7 +35,9 @@ def agent() -> None:
 @click.argument("content")
 @click.option("--name", "-n", default="CLI Agent", help="Agent worker name.")
 @click.option("--json-data", "-j", help="Structured JSON data to include.")
-def agent_update(content: str, name: str, json_data: Optional[str]) -> None:
+@click.option("--milestone", "-m", is_flag=True, default=False, help="Mark as a milestone accomplishment.")
+@click.option("--co-authors", "-c", multiple=True, help="Co-author email or UUID (repeatable, or comma-separated).")
+def agent_update(content: str, name: str, json_data: Optional[str], milestone: bool, co_authors: tuple[str, ...]) -> None:
     """Submit an agent activity report.
 
     \b
@@ -56,6 +58,14 @@ def agent_update(content: str, name: str, json_data: Optional[str]) -> None:
             print_error("Invalid JSON in --json-data.")
             raise SystemExit(1)
 
+    # Flatten comma-separated co-authors
+    co_author_list: list[str] = []
+    for val in co_authors:
+        for part in val.split(","):
+            stripped: str = part.strip()
+            if stripped:
+                co_author_list.append(stripped)
+
     client: DailyBotClient = DailyBotClient()
     try:
         with console.status("Submitting agent report..."):
@@ -63,8 +73,17 @@ def agent_update(content: str, name: str, json_data: Optional[str]) -> None:
                 agent_name=name,
                 content=content,
                 structured=structured,
+                is_milestone=milestone,
+                co_authors=co_author_list or None,
             )
-        print_success(f"Report submitted (id: {result.get('id', 'N/A')})")
+        msg: str = f"Report submitted (id: {result.get('id', 'N/A')})"
+        if result.get("is_milestone"):
+            msg += " [Milestone]"
+        co: list[dict[str, Any]] | None = result.get("co_authors")
+        if co:
+            names: str = ", ".join(a.get("name", a.get("uuid", "?")) for a in co)
+            msg += f"\n  Co-authors: {names}"
+        print_success(msg)
     except APIError as e:
         print_error(e.detail)
         raise SystemExit(1)

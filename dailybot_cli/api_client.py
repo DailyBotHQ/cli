@@ -165,6 +165,8 @@ class DailyBotClient:
         content: str,
         structured: Optional[dict[str, Any]] = None,
         metadata: Optional[dict[str, Any]] = None,
+        is_milestone: bool = False,
+        co_authors: Optional[list[str]] = None,
     ) -> dict[str, Any]:
         """POST /v1/agent-reports/"""
         payload: dict[str, Any] = {
@@ -175,6 +177,10 @@ class DailyBotClient:
             payload["structured"] = structured
         if metadata:
             payload["metadata"] = metadata
+        if is_milestone:
+            payload["is_milestone"] = True
+        if co_authors:
+            payload["co_authors"] = co_authors
         response: httpx.Response = httpx.post(
             f"{self.api_url}/v1/agent-reports/",
             json=payload,
