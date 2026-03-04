@@ -33,12 +33,20 @@ def _prompt_org_selection(organizations: list[dict[str, Any]]) -> dict[str, Any]
 
 
 def _print_org_list(organizations: list[dict[str, Any]]) -> None:
-    """Print organizations with IDs and names for non-interactive use."""
-    print_info("You belong to multiple organizations. Use --org=ID to select one:")
+    """Print organizations with UUIDs and names for non-interactive use."""
+    print_info("You belong to multiple organizations. Use --org=UUID to select one:")
     for org in organizations:
-        org_id: int = org.get("id", 0)
+        org_uuid: str = org.get("uuid", "")
         org_name: str = org.get("name", "Unknown")
-        click.echo(f"  {org_name} (id: {org_id})")
+        click.echo(f"  {org_name} (uuid: {org_uuid})")
+
+
+def _resolve_org_uuid(organizations: list[dict[str, Any]], org_uuid: str) -> Optional[int]:
+    """Find the integer ID for an org given its UUID."""
+    for org in organizations:
+        if org.get("uuid") == org_uuid:
+            return org["id"]  # type: ignore[no-any-return]
+    return None
 
 
 def _verify_and_save(client: DailyBotClient, email: str, code: str, organization_id: Optional[int]) -> None:
@@ -61,7 +69,7 @@ def _verify_and_save(client: DailyBotClient, email: str, code: str, organization
             return
         elif organizations:
             _print_org_list(organizations)
-            print_info(f"Run: dailybot login --email={email} --code={code} --org=ORG_ID")
+            print_info(f"Run: dailybot login --email={email} --code={code} --org=ORG_UUID")
         else:
             print_error("Organization selection required but no organizations returned.")
         raise SystemExit(1)
@@ -141,15 +149,34 @@ def _request_code_non_interactive(email: str) -> None:
 
     if is_multi_org and len(organizations) > 1:
         _print_org_list(organizations)
-        print_info(f"Run: dailybot login --email={email} --code=CODE --org=ORG_ID")
+        print_info(f"Run: dailybot login --email={email} --code=CODE --org=ORG_UUID")
     else:
         print_info(f"Run: dailybot login --email={email} --code=CODE")
 
 
-def _verify_non_interactive(email: str, code: str, org_id: Optional[int]) -> None:
+def _verify_non_interactive(email: str, code: str, org_uuid: Optional[str]) -> None:
     """Non-interactive step 2: verify code, handle missing --org for multi-org."""
     client: DailyBotClient = DailyBotClient()
-    _verify_and_save(client, email, code.strip(), org_id)
+
+    organization_id: Optional[int] = None
+    if org_uuid is not None:
+        # Resolve UUID to integer ID via request_code org list
+        try:
+            with console.status("Resolving organization..."):
+                request_result: dict[str, Any] = client.request_code(email)
+        except APIError as e:
+            print_error(e.detail)
+            raise SystemExit(1)
+
+        organizations: list[dict[str, Any]] = request_result.get("organizations", [])
+        organization_id = _resolve_org_uuid(organizations, org_uuid)
+        if organization_id is None:
+            print_error(f"Organization with uuid '{org_uuid}' not found.")
+            if organizations:
+                _print_org_list(organizations)
+            raise SystemExit(1)
+
+    _verify_and_save(client, email, code.strip(), organization_id)
 
 
 @click.command()
@@ -161,13 +188,13 @@ def _verify_non_interactive(email: str, code: str, org_id: Optional[int]) -> Non
 )
 @click.option(
     "--org",
-    "org_id",
+    "org_uuid",
     default=None,
-    type=int,
-    help="Organization ID to log in to (for multi-org accounts). Shown after requesting a code.",
+    type=str,
+    help="Organization UUID to log in to (for multi-org accounts). Shown after requesting a code.",
 )
 @click.pass_context
-def login(ctx: click.Context, email: str, code: Optional[str], org_id: Optional[int]) -> None:
+def login(ctx: click.Context, email: str, code: Optional[str], org_uuid: Optional[str]) -> None:
     """Authenticate with Dailybot via email OTP.
 
     \b
@@ -176,8 +203,8 @@ def login(ctx: click.Context, email: str, code: Optional[str], org_id: Optional[
         dailybot login --email=user@example.com
       Step 2: Verify the code
         dailybot login --email=user@example.com --code=123456
-      Multi-org: pass --org with the ID shown in step 1
-        dailybot login --email=user@example.com --code=123456 --org=2
+      Multi-org: pass --org with the UUID shown in step 1
+        dailybot login --email=user@example.com --code=123456 --org=abc-123
     """
     email_from_flag: bool = (
         ctx.get_parameter_source("email") == click.core.ParameterSource.COMMANDLINE
@@ -185,7 +212,7 @@ def login(ctx: click.Context, email: str, code: Optional[str], org_id: Optional[
 
     if code is not None:
         # Non-interactive step 2: verify code directly
-        _verify_non_interactive(email, code, org_id)
+        _verify_non_interactive(email, code, org_uuid)
     elif email_from_flag:
         # Non-interactive step 1: request code, print instructions, exit
         _request_code_non_interactive(email)

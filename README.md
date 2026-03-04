@@ -29,8 +29,8 @@ dailybot login
 dailybot login --email=user@example.com
 # Step 2: verify the code received by email
 dailybot login --email=user@example.com --code=123456
-# Multi-org: pass the org ID shown in step 1
-dailybot login --email=user@example.com --code=123456 --org=2
+# Multi-org: pass the org UUID shown in step 1
+dailybot login --email=user@example.com --code=123456 --org=abc-123
 
 # See what check-ins are waiting for you
 dailybot status

@@ -174,9 +174,17 @@ class TestLoginCommand:
         mock_client_cls: MagicMock,
         runner: CliRunner,
     ) -> None:
-        """Non-interactive step 2 with --org for multi-org accounts."""
+        """Non-interactive step 2 with --org UUID resolves to integer ID."""
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.api_url = "https://api.dailybot.com"
+        mock_client.request_code.return_value = {
+            "detail": "Verification code sent.",
+            "organizations": [
+                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+                {"id": 2, "name": "Side Project", "uuid": "def-456"},
+            ],
+            "is_multi_org": True,
+        }
         mock_client.verify_code.return_value = {
             "token": "tok999",
             "user": {"email": "user@test.com"},
@@ -184,15 +192,39 @@ class TestLoginCommand:
         }
 
         result = runner.invoke(
-            cli, ["login", "--email=user@test.com", "--code=654321", "--org=2"]
+            cli, ["login", "--email=user@test.com", "--code=654321", "--org=def-456"]
         )
         assert result.exit_code == 0
         assert "Logged in" in result.output
         assert "Side Project" in result.output
+        # Should resolve UUID to integer ID 2
         mock_client.verify_code.assert_called_once_with(
             "user@test.com", "654321", organization_id=2
         )
-        mock_client.request_code.assert_not_called()
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    def test_login_non_interactive_verify_with_bad_org_uuid(
+        self,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive --org with unknown UUID shows error and org list."""
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.request_code.return_value = {
+            "detail": "Verification code sent.",
+            "organizations": [
+                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+            ],
+            "is_multi_org": False,
+        }
+
+        result = runner.invoke(
+            cli, ["login", "--email=user@test.com", "--code=654321", "--org=wrong-uuid"]
+        )
+        assert result.exit_code != 0
+        assert "not found" in result.output
+        assert "Acme Corp" in result.output
 
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     def test_login_non_interactive_request_code_multi_org(
@@ -216,10 +248,10 @@ class TestLoginCommand:
         assert result.exit_code == 0
         assert "Verification code sent" in result.output
         assert "Acme Corp" in result.output
-        assert "id: 1" in result.output
+        assert "uuid: abc-123" in result.output
         assert "Side Project" in result.output
-        assert "id: 2" in result.output
-        assert "--code=CODE --org=ORG_ID" in result.output
+        assert "uuid: def-456" in result.output
+        assert "--code=CODE --org=ORG_UUID" in result.output
         # Should NOT prompt for code
         mock_client.verify_code.assert_not_called()
 
@@ -246,7 +278,7 @@ class TestLoginCommand:
         assert result.exit_code != 0
         assert "Acme Corp" in result.output
         assert "Side Project" in result.output
-        assert "--org=ORG_ID" in result.output
+        assert "--org=ORG_UUID" in result.output
 
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     @patch("dailybot_cli.commands.auth.save_credentials")
