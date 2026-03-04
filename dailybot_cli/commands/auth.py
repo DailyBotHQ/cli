@@ -1,4 +1,4 @@
-"""Authentication commands for DailyBot CLI."""
+"""Authentication commands for Dailybot CLI."""
 
 from typing import Any, Optional
 
@@ -90,9 +90,9 @@ def _do_login(email: str) -> None:
 
 
 @click.command()
-@click.option("--email", prompt="Email", help="Your DailyBot account email.")
+@click.option("--email", prompt="Email", help="Your Dailybot account email.")
 def login(email: str) -> None:
-    """Authenticate with DailyBot via email OTP."""
+    """Authenticate with Dailybot via email OTP."""
     _do_login(email)
 
 

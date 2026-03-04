@@ -1,4 +1,4 @@
-"""HTTP client for DailyBot CLI API endpoints."""
+"""HTTP client for Dailybot CLI API endpoints."""
 
 from typing import Any, Optional
 
@@ -17,7 +17,7 @@ class APIError(Exception):
 
 
 class DailyBotClient:
-    """HTTP client for the DailyBot /v1/cli/* API endpoints."""
+    """HTTP client for the Dailybot /v1/cli/* API endpoints."""
 
     def __init__(
         self,

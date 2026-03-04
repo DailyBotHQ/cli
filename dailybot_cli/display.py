@@ -1,4 +1,4 @@
-"""Rich console output helpers for DailyBot CLI."""
+"""Rich console output helpers for Dailybot CLI."""
 
 from typing import Any
 

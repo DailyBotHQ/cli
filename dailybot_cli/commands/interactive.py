@@ -1,4 +1,4 @@
-"""Interactive mode for DailyBot CLI."""
+"""Interactive mode for Dailybot CLI."""
 
 import readline  # noqa: F401 — enables arrow-key editing in input()
 from typing import Any, Optional
@@ -38,7 +38,7 @@ def run_interactive() -> None:
     creds: Optional[dict[str, Any]] = load_credentials()
     token: Optional[str] = get_token()
 
-    console.print(f"\n[bold]DailyBot CLI[/bold]")
+    console.print(f"\n[bold]Dailybot CLI[/bold]")
 
     if not token or not creds:
         console.print()
@@ -101,7 +101,7 @@ def _send_update(client: DailyBotClient) -> None:
         print_update_result(result)
     except httpx.TimeoutException:
         print_error(
-            "The request timed out. DailyBot may be processing your update — "
+            "The request timed out. Dailybot may be processing your update — "
             "please check your check-ins before retrying."
         )
     except APIError as e:

@@ -1,3 +1,3 @@
-"""DailyBot CLI - Submit check-in updates from your terminal."""
+"""Dailybot CLI - The command-line bridge between humans and agents."""
 
-__version__: str = "0.1.0"
+__version__: str = "0.2.0"

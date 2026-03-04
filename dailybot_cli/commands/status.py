@@ -1,4 +1,4 @@
-"""Status command for DailyBot CLI."""
+"""Status command for Dailybot CLI."""
 
 from typing import Any, Optional
 

@@ -1,1 +1,1 @@
-"""DailyBot CLI commands."""
+"""Dailybot CLI commands."""

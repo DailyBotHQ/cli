@@ -1,4 +1,4 @@
-"""Update command for DailyBot CLI."""
+"""Update command for Dailybot CLI."""
 
 from typing import Any, Optional
 
@@ -74,7 +74,7 @@ def update(
         print_update_result(result)
     except httpx.TimeoutException:
         print_error(
-            "The request timed out. DailyBot may be processing your update — "
+            "The request timed out. Dailybot may be processing your update — "
             "please check your check-ins before retrying."
         )
         raise SystemExit(1)
@@ -83,7 +83,7 @@ def update(
             print_error("Session expired. Please log in again: dailybot login")
         elif e.status_code == 400 and "ai processing failed" in e.detail.lower():
             print_error(
-                "DailyBot could not process your message. "
+                "Dailybot could not process your message. "
                 "Please try again, and if the issue persists contact support@dailybot.com"
             )
         else:

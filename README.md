@@ -1,8 +1,6 @@
-# DailyBot CLI
+# Dailybot CLI
 
-A command-line interface for [DailyBot](https://www.dailybot.com) that lets **people** and **software agents** share progress updates, blockers, and feedback — straight from the terminal.
-
-Whether you're a developer who lives in the terminal or an AI agent running in a CI pipeline, the DailyBot CLI gives you a fast way to submit check-ins without leaving your workflow.
+The command-line bridge between **humans** and **agents**. [Dailybot](https://www.dailybot.com) connects your team — whether they work in Slack, Google Chat, Discord, Microsoft Teams, or the web — with AI agents and automated workflows. The CLI brings that power to your terminal: progress reports, observability, health checks, messaging, and workflow automation for modern teams.
 
 ## Installation
 
@@ -20,7 +18,7 @@ Requires Python 3.9+.
 
 ## For humans
 
-Authenticate once with your DailyBot email, then submit updates and check pending check-ins right from your terminal.
+Authenticate once with your Dailybot email, then submit updates and check pending check-ins right from your terminal.
 
 ```bash
 # Log in (one-time setup, email OTP)
@@ -40,7 +38,7 @@ Run `dailybot` with no arguments to enter **interactive mode** — if you're not
 
 ## For agents
 
-Any software agent — AI coding assistants, CI jobs, deploy scripts, bots — can report activity through the CLI. This lets teams get visibility into what automated processes are doing, alongside human updates.
+Any software agent — AI coding assistants, CI jobs, deploy scripts, bots — can report activity through the CLI. This lets teams get visibility into what automated processes are doing, alongside human updates. Dailybot interconnects agents and humans with work analysis, progress reports, observability, and automations.
 
 Authenticate with any of these methods (checked in this order):
 

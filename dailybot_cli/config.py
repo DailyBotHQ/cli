@@ -1,4 +1,4 @@
-"""Credential and configuration management for DailyBot CLI."""
+"""Credential and configuration management for Dailybot CLI."""
 
 import json
 import os

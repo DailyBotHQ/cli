@@ -1,4 +1,4 @@
-"""Agent commands for DailyBot CLI (API key authentication)."""
+"""Agent commands for Dailybot CLI (API key authentication)."""
 
 from typing import Any, Optional
 
