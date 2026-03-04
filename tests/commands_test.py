@@ -137,6 +137,172 @@ class TestLoginCommand:
         result = runner.invoke(cli, ["login"], input="bad@test.com\n")
         assert result.exit_code != 0
 
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    @patch("dailybot_cli.commands.auth.save_credentials")
+    def test_login_non_interactive_verify(
+        self,
+        mock_save: MagicMock,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive step 2: --email + --code verifies directly."""
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.verify_code.return_value = {
+            "token": "tok789",
+            "user": {"email": "user@test.com"},
+            "organization": {"id": 1, "name": "MyOrg", "uuid": "org-uuid"},
+        }
+
+        result = runner.invoke(
+            cli, ["login", "--email=user@test.com", "--code=123456"]
+        )
+        assert result.exit_code == 0
+        assert "Logged in" in result.output
+        mock_client.verify_code.assert_called_once_with(
+            "user@test.com", "123456", organization_id=None
+        )
+        mock_save.assert_called_once()
+        # request_code should NOT be called
+        mock_client.request_code.assert_not_called()
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    @patch("dailybot_cli.commands.auth.save_credentials")
+    def test_login_non_interactive_verify_with_org(
+        self,
+        mock_save: MagicMock,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive step 2 with --org for multi-org accounts."""
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.verify_code.return_value = {
+            "token": "tok999",
+            "user": {"email": "user@test.com"},
+            "organization": {"id": 2, "name": "Side Project", "uuid": "def-456"},
+        }
+
+        result = runner.invoke(
+            cli, ["login", "--email=user@test.com", "--code=654321", "--org=2"]
+        )
+        assert result.exit_code == 0
+        assert "Logged in" in result.output
+        assert "Side Project" in result.output
+        mock_client.verify_code.assert_called_once_with(
+            "user@test.com", "654321", organization_id=2
+        )
+        mock_client.request_code.assert_not_called()
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    def test_login_non_interactive_request_code_multi_org(
+        self,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive step 1: --email requests code, prints orgs and instructions."""
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.request_code.return_value = {
+            "detail": "Verification code sent.",
+            "organizations": [
+                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+                {"id": 2, "name": "Side Project", "uuid": "def-456"},
+            ],
+            "is_multi_org": True,
+        }
+
+        result = runner.invoke(cli, ["login", "--email=user@test.com"])
+        assert result.exit_code == 0
+        assert "Verification code sent" in result.output
+        assert "Acme Corp" in result.output
+        assert "id: 1" in result.output
+        assert "Side Project" in result.output
+        assert "id: 2" in result.output
+        assert "--code=CODE --org=ORG_ID" in result.output
+        # Should NOT prompt for code
+        mock_client.verify_code.assert_not_called()
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    def test_login_non_interactive_verify_requires_org(
+        self,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive verify without --org when multi-org: prints orgs and instruction."""
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.verify_code.return_value = {
+            "requires_organization_selection": True,
+            "organizations": [
+                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+                {"id": 2, "name": "Side Project", "uuid": "def-456"},
+            ],
+        }
+
+        result = runner.invoke(
+            cli, ["login", "--email=user@test.com", "--code=123456"]
+        )
+        assert result.exit_code != 0
+        assert "Acme Corp" in result.output
+        assert "Side Project" in result.output
+        assert "--org=ORG_ID" in result.output
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    @patch("dailybot_cli.commands.auth.save_credentials")
+    def test_login_non_interactive_verify_auto_selects_single_org(
+        self,
+        mock_save: MagicMock,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive verify auto-selects when only one org available."""
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        # First call: requires org selection with 1 org
+        # Second call (retry with org_id): returns token
+        mock_client.verify_code.side_effect = [
+            {
+                "requires_organization_selection": True,
+                "organizations": [{"id": 1, "name": "MyOrg", "uuid": "org-uuid"}],
+            },
+            {
+                "token": "tok-auto",
+                "organization": {"id": 1, "name": "MyOrg", "uuid": "org-uuid"},
+            },
+        ]
+
+        result = runner.invoke(
+            cli, ["login", "--email=user@test.com", "--code=123456"]
+        )
+        assert result.exit_code == 0
+        assert "Auto-selecting organization: MyOrg" in result.output
+        assert "Logged in" in result.output
+        assert mock_client.verify_code.call_count == 2
+        mock_client.verify_code.assert_called_with("user@test.com", "123456", organization_id=1)
+
+    @patch("dailybot_cli.commands.auth.DailyBotClient")
+    def test_login_non_interactive_request_code_single_org(
+        self,
+        mock_client_cls: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive step 1 with single org: prints instructions without --org."""
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.api_url = "https://api.dailybot.com"
+        mock_client.request_code.return_value = {
+            "detail": "Verification code sent.",
+            "organizations": [{"id": 1, "name": "MyOrg", "uuid": "org-uuid"}],
+            "is_multi_org": False,
+        }
+
+        result = runner.invoke(cli, ["login", "--email=user@test.com"])
+        assert result.exit_code == 0
+        assert "Verification code sent" in result.output
+        assert "--code=CODE" in result.output
+        assert "--org" not in result.output
+        mock_client.verify_code.assert_not_called()
+
 
 class TestLogoutCommand:
 

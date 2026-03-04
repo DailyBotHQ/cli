@@ -21,8 +21,16 @@ Requires Python 3.9+.
 Authenticate once with your Dailybot email, then submit updates and check pending check-ins right from your terminal.
 
 ```bash
-# Log in (one-time setup, email OTP)
+# Log in (interactive, email OTP)
 dailybot login
+
+# Non-interactive login (for scripts and AI agents like Claude Code)
+# Step 1: request a verification code
+dailybot login --email=user@example.com
+# Step 2: verify the code received by email
+dailybot login --email=user@example.com --code=123456
+# Multi-org: pass the org ID shown in step 1
+dailybot login --email=user@example.com --code=123456 --org=2
 
 # See what check-ins are waiting for you
 dailybot status
