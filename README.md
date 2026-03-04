@@ -24,14 +24,6 @@ Authenticate once with your Dailybot email, then submit updates and check pendin
 # Log in (interactive, email OTP)
 dailybot login
 
-# Non-interactive login (for scripts and AI agents like Claude Code)
-# Step 1: request a verification code
-dailybot login --email=user@example.com
-# Step 2: verify the code received by email
-dailybot login --email=user@example.com --code=123456
-# Multi-org: pass the org UUID shown in step 1
-dailybot login --email=user@example.com --code=123456 --org=abc-123
-
 # See what check-ins are waiting for you
 dailybot status
 
@@ -48,6 +40,8 @@ Run `dailybot` with no arguments to enter **interactive mode** — if you're not
 
 Any software agent — AI coding assistants, CI jobs, deploy scripts, bots — can report activity through the CLI. This lets teams get visibility into what automated processes are doing, alongside human updates. Dailybot interconnects agents and humans with work analysis, progress reports, observability, and automations.
 
+### Authentication
+
 Authenticate with any of these methods (checked in this order):
 
 ```bash
@@ -61,7 +55,23 @@ dailybot config key=your-key
 dailybot login
 ```
 
-Then run agent commands:
+### Non-interactive login
+
+AI agents (e.g. Claude Code) and scripts can log in without interactive prompts using a two-step flow:
+
+```bash
+# Step 1: request a verification code — ask the user to check their email
+dailybot login --email=user@example.com
+
+# Step 2: verify the code the user received by email
+dailybot login --email=user@example.com --code=123456
+
+# Multi-org accounts: step 2 prints available organizations with UUIDs.
+# Re-run with --org to select one:
+dailybot login --email=user@example.com --code=123456 --org=abc-123
+```
+
+### Agent commands
 
 ```bash
 # Report a deployment
@@ -70,8 +80,12 @@ dailybot agent update "Deployed v2.1 to staging"
 # Name the agent so the team knows who's reporting
 dailybot agent update "Built feature X" --name "Claude Code"
 
-# Include structured data
-dailybot agent update "Tests passed" --name "CI Bot" --json-data '{"suite": "integration", "passed": 42}'
+# Include structured data (each field is an array; items become bullet points in Dailybot)
+dailybot agent update "Sprint progress" --name "Claude Code" --json-data '{
+  "completed": ["JWT authentication endpoint", "Token refresh logic", "Unit tests for auth flow"],
+  "in_progress": ["Integration tests"],
+  "blockers": []
+}'
 
 # Mark a report as a milestone
 dailybot agent update "Shipped v3.0" --milestone --name "Claude Code"
@@ -134,6 +148,18 @@ Options:
   -m, --milestone        Mark as a milestone accomplishment.
   -c, --co-authors TEXT  Co-author email or UUID (repeatable, or comma-separated).
   --help                 Show this message and exit.
+```
+
+#### Structured JSON data format
+
+The `--json-data` option accepts a JSON object whose values are **arrays of strings**. Each array item becomes a bullet-pointed update inside Dailybot. Use any field names that match your workflow:
+
+```json
+{
+  "completed": ["JWT auth endpoint", "Token refresh logic"],
+  "in_progress": ["Integration tests", "API docs"],
+  "blockers": ["Waiting on staging DB credentials"]
+}
 ```
 
 Run `dailybot --help` or `dailybot <command> --help` for full details on any command.
