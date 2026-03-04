@@ -18,10 +18,12 @@ def runner() -> CliRunner:
 class TestVersionAndHelp:
 
     def test_version(self, runner: CliRunner) -> None:
+        from dailybot_cli import __version__
+
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
         assert "dailybot" in result.output
-        assert "0.2.0" in result.output
+        assert __version__ in result.output
 
     def test_help(self, runner: CliRunner) -> None:
         result = runner.invoke(cli, ["--help"])
