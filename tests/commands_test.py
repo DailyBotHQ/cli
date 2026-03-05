@@ -517,6 +517,86 @@ class TestStatusCommand:
         assert result.exit_code == 0
         assert "No pending" in result.output
 
+    @patch("dailybot_cli.commands.status.get_token")
+    @patch("dailybot_cli.commands.status.DailyBotClient")
+    def test_status_auth_valid_login(
+        self, mock_client_cls: MagicMock, mock_get_token: MagicMock, runner: CliRunner
+    ) -> None:
+        """--auth with valid OTP session shows login auth info."""
+        mock_get_token.return_value = "tok"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.auth_status.return_value = {
+            "user": {"email": "user@test.com"},
+            "organization": {"name": "MyOrg", "uuid": "org-uuid"},
+        }
+
+        result = runner.invoke(cli, ["status", "--auth"])
+        assert result.exit_code == 0
+        assert "login (OTP)" in result.output
+        assert "user@test.com" in result.output
+        assert "MyOrg" in result.output
+
+    @patch("dailybot_cli.commands.status.get_api_key")
+    @patch("dailybot_cli.commands.status.get_token")
+    @patch("dailybot_cli.commands.status.DailyBotClient")
+    def test_status_auth_valid_api_key(
+        self,
+        mock_client_cls: MagicMock,
+        mock_get_token: MagicMock,
+        mock_get_api_key: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """--auth falls back to API key when no login token."""
+        mock_get_token.return_value = None
+        mock_get_api_key.return_value = "sk-abc123"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.get_agent_health.return_value = {"status": "healthy"}
+
+        result = runner.invoke(cli, ["status", "--auth"])
+        assert result.exit_code == 0
+        assert "API key" in result.output
+        assert "sk-a****" in result.output
+
+    @patch("dailybot_cli.commands.status.get_api_key")
+    @patch("dailybot_cli.commands.status.get_token")
+    @patch("dailybot_cli.commands.status.DailyBotClient")
+    def test_status_auth_expired_login_falls_back_to_api_key(
+        self,
+        mock_client_cls: MagicMock,
+        mock_get_token: MagicMock,
+        mock_get_api_key: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """--auth with expired login falls back to valid API key."""
+        from dailybot_cli.api_client import APIError
+
+        mock_get_token.return_value = "expired-tok"
+        mock_get_api_key.return_value = "sk-xyz789"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.auth_status.side_effect = APIError(401, "Unauthorized")
+        mock_client.get_agent_health.return_value = {"status": "healthy"}
+
+        result = runner.invoke(cli, ["status", "--auth"])
+        assert result.exit_code == 0
+        assert "invalid or expired" in result.output
+        assert "API key" in result.output
+
+    @patch("dailybot_cli.commands.status.get_api_key")
+    @patch("dailybot_cli.commands.status.get_token")
+    def test_status_auth_no_credentials(
+        self,
+        mock_get_token: MagicMock,
+        mock_get_api_key: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """--auth with no credentials shows error."""
+        mock_get_token.return_value = None
+        mock_get_api_key.return_value = None
+
+        result = runner.invoke(cli, ["status", "--auth"])
+        assert result.exit_code != 0
+        assert "Not authenticated" in result.output
+
 
 class TestInteractiveLogin:
 

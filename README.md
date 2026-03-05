@@ -69,6 +69,9 @@ dailybot login --email=user@example.com --code=123456
 # Multi-org accounts: step 2 prints available organizations with UUIDs.
 # Re-run with --org to select one:
 dailybot login --email=user@example.com --code=123456 --org=abc-123
+
+# Verify credentials are valid (checks login session, then API key)
+dailybot status --auth
 ```
 
 ### Agent commands

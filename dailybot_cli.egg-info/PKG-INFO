@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: dailybot-cli
-Version: 0.3.2
+Version: 0.3.3
 Summary: Dailybot CLI - The command-line bridge between humans and agents. Progress reports, observability, and workflow automation for modern teams across Slack, Google Chat, Discord, MS Teams, and more.
 Author-email: Dailybot <support@dailybot.com>
 License: MIT
@@ -96,6 +96,9 @@ dailybot login --email=user@example.com --code=123456
 # Multi-org accounts: step 2 prints available organizations with UUIDs.
 # Re-run with --org to select one:
 dailybot login --email=user@example.com --code=123456 --org=abc-123
+
+# Verify credentials are valid (checks login session, then API key)
+dailybot status --auth
 ```
 
 ### Agent commands
