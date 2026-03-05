@@ -1,3 +1,3 @@
 """Dailybot CLI - The command-line bridge between humans and agents."""
 
-__version__: str = "0.3.3"
+__version__: str = "0.3.5"

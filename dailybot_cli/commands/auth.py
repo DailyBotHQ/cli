@@ -158,25 +158,44 @@ def _verify_non_interactive(email: str, code: str, org_uuid: Optional[str]) -> N
     """Non-interactive step 2: verify code, handle missing --org for multi-org."""
     client: DailyBotClient = DailyBotClient()
 
-    organization_id: Optional[int] = None
     if org_uuid is not None:
-        # Resolve UUID to integer ID via request_code org list
+        # First call verify without org — if multi-org, the API returns
+        # requires_organization_selection with the org list so we can resolve
+        # the UUID to an integer ID without calling request_code again
+        # (which would invalidate the OTP).
         try:
-            with console.status("Resolving organization..."):
-                request_result: dict[str, Any] = client.request_code(email)
+            with console.status("Verifying code..."):
+                result: dict[str, Any] = client.verify_code(email, code.strip(), organization_id=None)
         except APIError as e:
             print_error(e.detail)
             raise SystemExit(1)
 
-        organizations: list[dict[str, Any]] = request_result.get("organizations", [])
-        organization_id = _resolve_org_uuid(organizations, org_uuid)
-        if organization_id is None:
-            print_error(f"Organization with uuid '{org_uuid}' not found.")
-            if organizations:
-                _print_org_list(organizations)
-            raise SystemExit(1)
-
-    _verify_and_save(client, email, code.strip(), organization_id)
+        if result.get("requires_organization_selection"):
+            organizations: list[dict[str, Any]] = result.get("organizations", [])
+            organization_id: Optional[int] = _resolve_org_uuid(organizations, org_uuid)
+            if organization_id is None:
+                print_error(f"Organization with uuid '{org_uuid}' not found.")
+                if organizations:
+                    _print_org_list(organizations)
+                raise SystemExit(1)
+            # Retry with the resolved org ID
+            _verify_and_save(client, email, code.strip(), organization_id)
+        else:
+            # Single org or no selection needed — token already returned
+            token: Optional[str] = result.get("token")
+            if not token:
+                print_error("Authentication failed: no token received.")
+                raise SystemExit(1)
+            org_raw: Any = result.get("organization", "")
+            org_name: str = org_raw.get("name", "") if isinstance(org_raw, dict) else str(org_raw)
+            org_uuid_val: str = org_raw.get("uuid", "") if isinstance(org_raw, dict) else result.get("organization_uuid", "")
+            save_credentials(
+                token=token, email=email, organization=org_name,
+                organization_uuid=org_uuid_val, api_url=client.api_url,
+            )
+            print_success(f"Logged in as {email} ({org_name})")
+    else:
+        _verify_and_save(client, email, code.strip(), None)
 
 
 @click.command()

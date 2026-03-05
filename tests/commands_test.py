@@ -179,19 +179,22 @@ class TestLoginCommand:
         """Non-interactive step 2 with --org UUID resolves to integer ID."""
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.api_url = "https://api.dailybot.com"
-        mock_client.request_code.return_value = {
-            "detail": "Verification code sent.",
-            "organizations": [
-                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
-                {"id": 2, "name": "Side Project", "uuid": "def-456"},
-            ],
-            "is_multi_org": True,
-        }
-        mock_client.verify_code.return_value = {
-            "token": "tok999",
-            "user": {"email": "user@test.com"},
-            "organization": {"id": 2, "name": "Side Project", "uuid": "def-456"},
-        }
+        # First verify call (no org) returns requires_organization_selection
+        # Second verify call (with org_id) returns token
+        mock_client.verify_code.side_effect = [
+            {
+                "requires_organization_selection": True,
+                "organizations": [
+                    {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+                    {"id": 2, "name": "Side Project", "uuid": "def-456"},
+                ],
+            },
+            {
+                "token": "tok999",
+                "user": {"email": "user@test.com"},
+                "organization": {"id": 2, "name": "Side Project", "uuid": "def-456"},
+            },
+        ]
 
         result = runner.invoke(
             cli, ["login", "--email=user@test.com", "--code=654321", "--org=def-456"]
@@ -199,8 +202,11 @@ class TestLoginCommand:
         assert result.exit_code == 0
         assert "Logged in" in result.output
         assert "Side Project" in result.output
-        # Should resolve UUID to integer ID 2
-        mock_client.verify_code.assert_called_once_with(
+        # Should NOT call request_code (would invalidate the OTP)
+        mock_client.request_code.assert_not_called()
+        # Second call resolves UUID to integer ID 2
+        assert mock_client.verify_code.call_count == 2
+        mock_client.verify_code.assert_called_with(
             "user@test.com", "654321", organization_id=2
         )
 
@@ -213,12 +219,11 @@ class TestLoginCommand:
         """Non-interactive --org with unknown UUID shows error and org list."""
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.api_url = "https://api.dailybot.com"
-        mock_client.request_code.return_value = {
-            "detail": "Verification code sent.",
+        mock_client.verify_code.return_value = {
+            "requires_organization_selection": True,
             "organizations": [
                 {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
             ],
-            "is_multi_org": False,
         }
 
         result = runner.invoke(
@@ -643,6 +648,30 @@ class TestAgentCommand:
         assert "Report submitted" in result.output
 
     @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_agent_update_with_metadata(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {"id": 2, "uuid": "def"}
+
+        result = runner.invoke(
+            cli, ["agent", "update", "Fixed login bug", "--name", "Claude Code",
+                  "--metadata", '{"repo": "api-services", "branch": "fix/login", "pr": "#142"}']
+        )
+        assert result.exit_code == 0
+        assert "Report submitted" in result.output
+        mock_client.submit_agent_report.assert_called_once_with(
+            agent_name="Claude Code",
+            content="Fixed login bug",
+            structured=None,
+            metadata={"repo": "api-services", "branch": "fix/login", "pr": "#142"},
+            is_milestone=False,
+            co_authors=None,
+        )
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_update_no_api_key(
         self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
@@ -1008,6 +1037,7 @@ class TestAgentCommand:
             agent_name="CLI Agent",
             content="Big feature",
             structured=None,
+            metadata=None,
             is_milestone=True,
             co_authors=None,
         )
@@ -1037,6 +1067,7 @@ class TestAgentCommand:
             agent_name="CLI Agent",
             content="Paired work",
             structured=None,
+            metadata=None,
             is_milestone=False,
             co_authors=["alice@co.com", "bob@co.com"],
         )
@@ -1066,6 +1097,7 @@ class TestAgentCommand:
             agent_name="CLI Agent",
             content="Paired work",
             structured=None,
+            metadata=None,
             is_milestone=False,
             co_authors=["alice@co.com", "bob@co.com"],
         )
@@ -1094,6 +1126,7 @@ class TestAgentCommand:
             agent_name="CLI Agent",
             content="Big feature",
             structured=None,
+            metadata=None,
             is_milestone=True,
             co_authors=["alice@co.com"],
         )

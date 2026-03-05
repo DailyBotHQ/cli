@@ -90,6 +90,9 @@ dailybot agent update "Sprint progress" --name "Claude Code" --json-data '{
   "blockers": []
 }'
 
+# Attach metadata (repo, branch, PR, or any key-value context)
+dailybot agent update "Fixed login bug" --name "Claude Code" --metadata '{"repo": "api-services", "branch": "fix/login", "pr": "#142"}'
+
 # Mark a report as a milestone
 dailybot agent update "Shipped v3.0" --milestone --name "Claude Code"
 
@@ -148,6 +151,7 @@ Usage: dailybot agent update [OPTIONS] CONTENT
 Options:
   -n, --name TEXT        Agent worker name.
   -j, --json-data TEXT   Structured JSON data to include.
+  -d, --metadata TEXT    JSON metadata (e.g. repo, branch, PR).
   -m, --milestone        Mark as a milestone accomplishment.
   -c, --co-authors TEXT  Co-author email or UUID (repeatable, or comma-separated).
   --help                 Show this message and exit.
