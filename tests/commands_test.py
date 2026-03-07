@@ -168,33 +168,30 @@ class TestLoginCommand:
         # request_code should NOT be called
         mock_client.request_code.assert_not_called()
 
+    @patch("dailybot_cli.commands.auth.clear_org_cache")
+    @patch("dailybot_cli.commands.auth.load_org_cache")
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     @patch("dailybot_cli.commands.auth.save_credentials")
     def test_login_non_interactive_verify_with_org(
         self,
         mock_save: MagicMock,
         mock_client_cls: MagicMock,
+        mock_load_cache: MagicMock,
+        mock_clear_cache: MagicMock,
         runner: CliRunner,
     ) -> None:
-        """Non-interactive step 2 with --org UUID resolves to integer ID."""
+        """Non-interactive step 2 with --org UUID resolves via cached org list."""
+        mock_load_cache.return_value = [
+            {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+            {"id": 2, "name": "Side Project", "uuid": "def-456"},
+        ]
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.api_url = "https://api.dailybot.com"
-        # First verify call (no org) returns requires_organization_selection
-        # Second verify call (with org_id) returns token
-        mock_client.verify_code.side_effect = [
-            {
-                "requires_organization_selection": True,
-                "organizations": [
-                    {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
-                    {"id": 2, "name": "Side Project", "uuid": "def-456"},
-                ],
-            },
-            {
-                "token": "tok999",
-                "user": {"email": "user@test.com"},
-                "organization": {"id": 2, "name": "Side Project", "uuid": "def-456"},
-            },
-        ]
+        mock_client.verify_code.return_value = {
+            "token": "tok999",
+            "user": {"email": "user@test.com"},
+            "organization": {"id": 2, "name": "Side Project", "uuid": "def-456"},
+        }
 
         result = runner.invoke(
             cli, ["login", "--email=user@test.com", "--code=654321", "--org=def-456"]
@@ -204,27 +201,24 @@ class TestLoginCommand:
         assert "Side Project" in result.output
         # Should NOT call request_code (would invalidate the OTP)
         mock_client.request_code.assert_not_called()
-        # Second call resolves UUID to integer ID 2
-        assert mock_client.verify_code.call_count == 2
-        mock_client.verify_code.assert_called_with(
+        # Single verify call with resolved integer ID
+        mock_client.verify_code.assert_called_once_with(
             "user@test.com", "654321", organization_id=2
         )
+        mock_clear_cache.assert_called_once()
 
+    @patch("dailybot_cli.commands.auth.load_org_cache")
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     def test_login_non_interactive_verify_with_bad_org_uuid(
         self,
         mock_client_cls: MagicMock,
+        mock_load_cache: MagicMock,
         runner: CliRunner,
     ) -> None:
         """Non-interactive --org with unknown UUID shows error and org list."""
-        mock_client: MagicMock = mock_client_cls.return_value
-        mock_client.api_url = "https://api.dailybot.com"
-        mock_client.verify_code.return_value = {
-            "requires_organization_selection": True,
-            "organizations": [
-                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
-            ],
-        }
+        mock_load_cache.return_value = [
+            {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+        ]
 
         result = runner.invoke(
             cli, ["login", "--email=user@test.com", "--code=654321", "--org=wrong-uuid"]
@@ -233,21 +227,39 @@ class TestLoginCommand:
         assert "not found" in result.output
         assert "Acme Corp" in result.output
 
+    @patch("dailybot_cli.commands.auth.load_org_cache")
+    def test_login_non_interactive_verify_with_org_no_cache(
+        self,
+        mock_load_cache: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Non-interactive --org without cached org list tells user to run step 1."""
+        mock_load_cache.return_value = None
+
+        result = runner.invoke(
+            cli, ["login", "--email=user@test.com", "--code=654321", "--org=abc-123"]
+        )
+        assert result.exit_code != 0
+        assert "No cached organization list" in result.output
+
+    @patch("dailybot_cli.commands.auth.save_org_cache")
     @patch("dailybot_cli.commands.auth.DailyBotClient")
     def test_login_non_interactive_request_code_multi_org(
         self,
         mock_client_cls: MagicMock,
+        mock_save_cache: MagicMock,
         runner: CliRunner,
     ) -> None:
-        """Non-interactive step 1: --email requests code, prints orgs and instructions."""
+        """Non-interactive step 1: --email requests code, prints orgs, caches org list."""
+        orgs = [
+            {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
+            {"id": 2, "name": "Side Project", "uuid": "def-456"},
+        ]
         mock_client: MagicMock = mock_client_cls.return_value
         mock_client.api_url = "https://api.dailybot.com"
         mock_client.request_code.return_value = {
             "detail": "Verification code sent.",
-            "organizations": [
-                {"id": 1, "name": "Acme Corp", "uuid": "abc-123"},
-                {"id": 2, "name": "Side Project", "uuid": "def-456"},
-            ],
+            "organizations": orgs,
             "is_multi_org": True,
         }
 
@@ -259,6 +271,8 @@ class TestLoginCommand:
         assert "Side Project" in result.output
         assert "uuid: def-456" in result.output
         assert "--code=CODE --org=ORG_UUID" in result.output
+        # Should cache org list for step 2
+        mock_save_cache.assert_called_once_with("user@test.com", orgs)
         # Should NOT prompt for code
         mock_client.verify_code.assert_not_called()
 
@@ -1140,6 +1154,140 @@ class TestAgentCommand:
         assert result.exit_code != 0
         assert "dailybot config key=" in result.output
         assert "dailybot login" in result.output
+
+
+class TestAgentEmailCommand:
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_email_send(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.send_agent_email.return_value = {
+            "sent_count": 1,
+            "total_recipients": 1,
+            "reply_to": "ag-abc@mail.dailybot.com",
+        }
+
+        result = runner.invoke(
+            cli,
+            ["agent", "email", "send",
+             "--to", "user@example.com",
+             "--subject", "Build passed",
+             "--body-html", "<p>All green.</p>",
+             "--name", "Claude Code"],
+        )
+        assert result.exit_code == 0
+        assert "Email Sent" in result.output
+        assert "1 of 1" in result.output
+        assert "ag-abc@mail.dailybot.com" in result.output
+        mock_client.send_agent_email.assert_called_once_with(
+            agent_name="Claude Code",
+            to=["user@example.com"],
+            subject="Build passed",
+            body_html="<p>All green.</p>",
+            metadata=None,
+        )
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_email_send_multiple_recipients(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.send_agent_email.return_value = {
+            "sent_count": 2,
+            "total_recipients": 2,
+            "reply_to": "ag-abc@mail.dailybot.com",
+        }
+
+        result = runner.invoke(
+            cli,
+            ["agent", "email", "send",
+             "--to", "a@co.com", "--to", "b@co.com",
+             "--subject", "Report",
+             "--body-html", "<h1>Done</h1>",
+             "--name", "CI Bot"],
+        )
+        assert result.exit_code == 0
+        assert "2 of 2" in result.output
+        mock_client.send_agent_email.assert_called_once_with(
+            agent_name="CI Bot",
+            to=["a@co.com", "b@co.com"],
+            subject="Report",
+            body_html="<h1>Done</h1>",
+            metadata=None,
+        )
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_email_send_rate_limited(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        from dailybot_cli.api_client import APIError
+
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.send_agent_email.side_effect = APIError(
+            429, "Agent email hourly limit exceeded."
+        )
+
+        result = runner.invoke(
+            cli,
+            ["agent", "email", "send",
+             "--to", "user@example.com",
+             "--subject", "Test",
+             "--body-html", "<p>Hi</p>"],
+        )
+        assert result.exit_code != 0
+        assert "Hourly email limit exceeded" in result.output
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    def test_email_send_no_auth(
+        self, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = None
+        result = runner.invoke(
+            cli,
+            ["agent", "email", "send",
+             "--to", "user@example.com",
+             "--subject", "Test",
+             "--body-html", "<p>Hi</p>"],
+        )
+        assert result.exit_code != 0
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_email_send_with_metadata(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.send_agent_email.return_value = {
+            "sent_count": 1,
+            "total_recipients": 1,
+            "reply_to": "ag-abc@mail.dailybot.com",
+        }
+
+        result = runner.invoke(
+            cli,
+            ["agent", "email", "send",
+             "--to", "user@example.com",
+             "--subject", "Build",
+             "--body-html", "<p>Done</p>",
+             "--metadata", '{"pr": "#42"}'],
+        )
+        assert result.exit_code == 0
+        mock_client.send_agent_email.assert_called_once_with(
+            agent_name="CLI Agent",
+            to=["user@example.com"],
+            subject="Build",
+            body_html="<p>Done</p>",
+            metadata={"pr": "#42"},
+        )
 
 
 class TestConfigCommand:

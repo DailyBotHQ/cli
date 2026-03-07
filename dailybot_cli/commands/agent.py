@@ -8,10 +8,12 @@ from dailybot_cli.api_client import APIError, DailyBotClient
 from dailybot_cli.config import get_agent_auth
 from dailybot_cli.display import (
     console,
+    print_agent_email_sent,
     print_agent_health,
     print_agent_message_sent,
     print_agent_messages,
     print_error,
+    print_info,
     print_success,
     print_webhook_result,
 )
@@ -295,4 +297,70 @@ def message_list(name: str, pending: bool) -> None:
         print_agent_messages(messages)
     except APIError as e:
         print_error(e.detail)
+        raise SystemExit(1)
+
+
+# --- Email subcommand group ---
+
+
+@agent.group(name="email")
+def agent_email() -> None:
+    """Send emails through an agent."""
+    pass
+
+
+@agent_email.command(name="send")
+@click.option("--to", "recipients", multiple=True, required=True, help="Recipient email (repeatable).")
+@click.option("--subject", required=True, help="Email subject line.")
+@click.option("--body-html", required=True, help="HTML email body.")
+@click.option("--name", "-n", default="CLI Agent", help="Agent name.")
+@click.option("--metadata", "-d", default=None, help="JSON metadata to include.")
+def email_send(
+    recipients: tuple[str, ...],
+    subject: str,
+    body_html: str,
+    name: str,
+    metadata: Optional[str],
+) -> None:
+    """Send an email through an agent.
+
+    \b
+      dailybot agent email send --to user@example.com --subject "Build passed" \\
+        --body-html "<p>All green.</p>" --name "Claude Code"
+      dailybot agent email send --to a@co.com --to b@co.com --subject "Report" \\
+        --body-html "<h1>Done</h1>"
+    """
+    if not get_agent_auth():
+        print_error(_NO_AUTH_MSG)
+        raise SystemExit(1)
+
+    to_list: list[str] = list(recipients)
+
+    metadata_dict: Optional[dict[str, Any]] = None
+    if metadata:
+        import json
+
+        try:
+            metadata_dict = json.loads(metadata)
+        except json.JSONDecodeError:
+            print_error("Invalid JSON in --metadata.")
+            raise SystemExit(1)
+
+    client: DailyBotClient = DailyBotClient()
+    try:
+        with console.status("Sending email..."):
+            result: dict[str, Any] = client.send_agent_email(
+                agent_name=name,
+                to=to_list,
+                subject=subject,
+                body_html=body_html,
+                metadata=metadata_dict,
+            )
+        print_agent_email_sent(result)
+    except APIError as e:
+        if e.status_code == 429:
+            print_error("Hourly email limit exceeded. Try again later.")
+            print_info(e.detail)
+        else:
+            print_error(e.detail)
         raise SystemExit(1)

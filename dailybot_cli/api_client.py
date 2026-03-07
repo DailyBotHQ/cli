@@ -254,6 +254,33 @@ class DailyBotClient:
         )
         return self._handle_response(response)
 
+    # --- Agent email endpoints ---
+
+    def send_agent_email(
+        self,
+        agent_name: str,
+        to: list[str],
+        subject: str,
+        body_html: str,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """POST /v1/agent-email/send/"""
+        payload: dict[str, Any] = {
+            "agent_name": agent_name,
+            "to": to,
+            "subject": subject,
+            "body_html": body_html,
+        }
+        if metadata:
+            payload["metadata"] = metadata
+        response: httpx.Response = httpx.post(
+            f"{self.api_url}/v1/agent-email/send/",
+            json=payload,
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
     # --- Agent message endpoints ---
 
     def send_agent_message(

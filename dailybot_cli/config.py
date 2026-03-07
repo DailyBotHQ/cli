@@ -17,6 +17,7 @@ def set_api_url_override(url: str) -> None:
 CONFIG_DIR: Path = Path.home() / ".config" / "dailybot"
 CREDENTIALS_FILE: Path = CONFIG_DIR / "credentials.json"
 CONFIG_FILE: Path = CONFIG_DIR / "config.json"
+ORG_CACHE_FILE: Path = CONFIG_DIR / "org_cache.json"
 
 
 def get_config_dir() -> Path:
@@ -121,6 +122,32 @@ def get_api_key() -> Optional[str]:
         return env_key
     config: dict[str, Any] = load_config()
     return config.get("api_key") or None
+
+
+def save_org_cache(email: str, organizations: list[dict[str, Any]]) -> None:
+    """Cache the org list from request_code for UUID resolution in step 2."""
+    get_config_dir()
+    data: dict[str, Any] = {"email": email, "organizations": organizations}
+    ORG_CACHE_FILE.write_text(json.dumps(data))
+
+
+def load_org_cache(email: str) -> Optional[list[dict[str, Any]]]:
+    """Load cached org list for the given email. Returns None if missing or stale."""
+    if not ORG_CACHE_FILE.exists():
+        return None
+    try:
+        data: dict[str, Any] = json.loads(ORG_CACHE_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    if data.get("email") != email:
+        return None
+    return data.get("organizations")
+
+
+def clear_org_cache() -> None:
+    """Remove the org cache file."""
+    if ORG_CACHE_FILE.exists():
+        ORG_CACHE_FILE.unlink()
 
 
 def get_agent_auth() -> Optional[str]:

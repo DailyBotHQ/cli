@@ -123,7 +123,17 @@ dailybot agent message send --to "Claude Code" --content "Do X" --type command
 # List messages for an agent
 dailybot agent message list --name "Claude Code"
 dailybot agent message list --name "Claude Code" --pending
+
+# Send an email through an agent
+dailybot agent email send --to user@example.com --subject "Build passed" \
+  --body-html "<p>All green.</p>" --name "Claude Code"
+
+# Send to multiple recipients
+dailybot agent email send --to a@co.com --to b@co.com --subject "Report" \
+  --body-html "<h1>Sprint complete</h1>" --name "Claude Code"
 ```
+
+Replies to agent emails land as messages retrievable via `dailybot agent message list`.
 
 ## Commands
 
@@ -140,6 +150,7 @@ dailybot agent message list --name "Claude Code" --pending
 | `dailybot agent webhook unregister` | Unregister the agent's webhook (API key or login) |
 | `dailybot agent message send` | Send a message to an agent (API key or login) |
 | `dailybot agent message list` | List messages for an agent (API key or login) |
+| `dailybot agent email send` | Send an email through an agent (API key or login) |
 
 ### `dailybot agent update`
 

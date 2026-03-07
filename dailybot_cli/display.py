@@ -184,6 +184,18 @@ def print_agent_message_sent(data: dict[str, Any]) -> None:
     console.print(Panel(table, title="[bold]Message Sent[/bold]", border_style="green"))
 
 
+def print_agent_email_sent(data: dict[str, Any]) -> None:
+    """Display the result of sending an agent email."""
+    table: Table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("Sent", f"{data.get('sent_count', 0)} of {data.get('total_recipients', 0)} recipients")
+    reply_to: str = data.get("reply_to", "")
+    if reply_to:
+        table.add_row("Reply-to", reply_to)
+    console.print(Panel(table, title="[bold]Email Sent[/bold]", border_style="green"))
+
+
 def print_update_result(data: dict[str, Any]) -> None:
     """Display the result of submitting an update."""
     count: int = data.get("followups_count", 0)

@@ -7,7 +7,14 @@ import click
 import questionary
 
 from dailybot_cli.api_client import APIError, DailyBotClient
-from dailybot_cli.config import clear_credentials, get_token, save_credentials
+from dailybot_cli.config import (
+    clear_credentials,
+    clear_org_cache,
+    get_token,
+    load_org_cache,
+    save_credentials,
+    save_org_cache,
+)
 from dailybot_cli.display import (
     console,
     print_error,
@@ -148,6 +155,7 @@ def _request_code_non_interactive(email: str) -> None:
     organizations: list[dict[str, Any]] = request_result.get("organizations", [])
 
     if is_multi_org and len(organizations) > 1:
+        save_org_cache(email, organizations)
         _print_org_list(organizations)
         print_info(f"Run: dailybot login --email={email} --code=CODE --org=ORG_UUID")
     else:
@@ -158,44 +166,25 @@ def _verify_non_interactive(email: str, code: str, org_uuid: Optional[str]) -> N
     """Non-interactive step 2: verify code, handle missing --org for multi-org."""
     client: DailyBotClient = DailyBotClient()
 
+    organization_id: Optional[int] = None
     if org_uuid is not None:
-        # First call verify without org — if multi-org, the API returns
-        # requires_organization_selection with the org list so we can resolve
-        # the UUID to an integer ID without calling request_code again
-        # (which would invalidate the OTP).
-        try:
-            with console.status("Verifying code..."):
-                result: dict[str, Any] = client.verify_code(email, code.strip(), organization_id=None)
-        except APIError as e:
-            print_error(e.detail)
+        # Resolve UUID → integer ID from the cached org list (saved in step 1).
+        # This avoids calling request_code or verify_code without org_id,
+        # which would consume/invalidate the OTP.
+        cached_orgs: Optional[list[dict[str, Any]]] = load_org_cache(email)
+        if cached_orgs is None:
+            print_error("No cached organization list found. Run step 1 first:")
+            print_info(f"  dailybot login --email={email}")
             raise SystemExit(1)
 
-        if result.get("requires_organization_selection"):
-            organizations: list[dict[str, Any]] = result.get("organizations", [])
-            organization_id: Optional[int] = _resolve_org_uuid(organizations, org_uuid)
-            if organization_id is None:
-                print_error(f"Organization with uuid '{org_uuid}' not found.")
-                if organizations:
-                    _print_org_list(organizations)
-                raise SystemExit(1)
-            # Retry with the resolved org ID
-            _verify_and_save(client, email, code.strip(), organization_id)
-        else:
-            # Single org or no selection needed — token already returned
-            token: Optional[str] = result.get("token")
-            if not token:
-                print_error("Authentication failed: no token received.")
-                raise SystemExit(1)
-            org_raw: Any = result.get("organization", "")
-            org_name: str = org_raw.get("name", "") if isinstance(org_raw, dict) else str(org_raw)
-            org_uuid_val: str = org_raw.get("uuid", "") if isinstance(org_raw, dict) else result.get("organization_uuid", "")
-            save_credentials(
-                token=token, email=email, organization=org_name,
-                organization_uuid=org_uuid_val, api_url=client.api_url,
-            )
-            print_success(f"Logged in as {email} ({org_name})")
-    else:
-        _verify_and_save(client, email, code.strip(), None)
+        organization_id = _resolve_org_uuid(cached_orgs, org_uuid)
+        if organization_id is None:
+            print_error(f"Organization with uuid '{org_uuid}' not found.")
+            _print_org_list(cached_orgs)
+            raise SystemExit(1)
+
+    _verify_and_save(client, email, code.strip(), organization_id)
+    clear_org_cache()
 
 
 @click.command()
