@@ -74,6 +74,56 @@ dailybot login --email=user@example.com --code=123456 --org=abc-123
 dailybot status --auth
 ```
 
+### Agent profiles
+
+Configure a named agent identity so all agent commands use your preferred name and credentials automatically. Profiles are stored in `~/.config/dailybot/agents.json`.
+
+```bash
+# Configure a profile using your login session (no API key needed)
+dailybot agent configure --name "Claude Code"
+
+# Configure with an API key (for CI pipelines or dedicated agents)
+dailybot agent configure --name "CI Bot" --key your-api-key
+
+# Configure with a custom profile name
+dailybot agent configure --name "Claude Code" --profile claude
+
+# List all configured profiles
+dailybot agent profiles
+```
+
+Once configured, all agent commands use the default profile automatically — no need to pass `--name` every time:
+
+```bash
+# Uses the default profile's agent name
+dailybot agent update "Deployed v2.1 to staging"
+
+# Override with a specific profile
+dailybot agent --profile ci-bot update "Build #42 passed"
+```
+
+Auth resolution order:
+1. `--profile` flag (explicit profile from `agents.json`)
+2. Default profile from `agents.json`
+3. `DAILYBOT_API_KEY` environment variable
+4. `dailybot config key=...` (stored API key)
+5. Login session (Bearer token from `dailybot login`)
+
+### Standalone registration
+
+No Dailybot account? Agents can register autonomously — no human setup required:
+
+```bash
+dailybot agent register --org-name "My Startup" --agent-name "Claude Code"
+
+# Optionally provide a human contact email
+dailybot agent register --org-name "My Startup" --agent-name "Claude Code" --email me@co.com
+```
+
+This creates an organization, generates an API key, and saves it as a profile automatically. Every registered agent gets a **free Dailybot email address** (e.g. `claude-code@mail.dailybot.co`) so it can send and receive messages worldwide — with humans and other agents alike.
+
+The output includes a **claim URL** — share it with your team admin to connect the org to Slack, Google Chat, Discord, Microsoft Teams, or other platforms. The claim URL expires in 30 days.
+
 ### Agent commands
 
 ```bash
@@ -122,7 +172,14 @@ dailybot agent message send --to "Claude Code" --content "Do X" --type command
 
 # List messages for an agent
 dailybot agent message list --name "Claude Code"
-dailybot agent message list --name "Claude Code" --pending
+dailybot agent message list --pending
+
+# Mark specific messages as read
+dailybot agent message claim abc-123
+dailybot agent message claim abc-123 def-456
+
+# Mark all pending messages as delivered (via health check)
+dailybot agent message claim-all
 
 # Send an email through an agent
 dailybot agent email send --to user@example.com --subject "Build passed" \
@@ -144,13 +201,18 @@ Replies to agent emails land as messages retrievable via `dailybot agent message
 | `dailybot status` | Show pending check-ins for today |
 | `dailybot update` | Submit a check-in update (free-text or structured) |
 | `dailybot config` | Get, set, or remove a stored setting (e.g. API key) |
-| `dailybot agent update` | Submit an agent activity report (API key or login) |
-| `dailybot agent health` | Report or query agent health status (API key or login) |
-| `dailybot agent webhook register` | Register a webhook for the agent (API key or login) |
-| `dailybot agent webhook unregister` | Unregister the agent's webhook (API key or login) |
-| `dailybot agent message send` | Send a message to an agent (API key or login) |
-| `dailybot agent message list` | List messages for an agent (API key or login) |
-| `dailybot agent email send` | Send an email through an agent (API key or login) |
+| `dailybot agent configure` | Configure a named agent profile |
+| `dailybot agent profiles` | List all configured agent profiles |
+| `dailybot agent register` | Register a new agent and organization (standalone) |
+| `dailybot agent update` | Submit an agent activity report |
+| `dailybot agent health` | Report or query agent health status |
+| `dailybot agent webhook register` | Register a webhook for the agent |
+| `dailybot agent webhook unregister` | Unregister the agent's webhook |
+| `dailybot agent message send` | Send a message to an agent |
+| `dailybot agent message list` | List messages for an agent |
+| `dailybot agent message claim` | Mark specific messages as read |
+| `dailybot agent message claim-all` | Mark all pending messages as delivered |
+| `dailybot agent email send` | Send an email through an agent |
 
 ### `dailybot agent update`
 

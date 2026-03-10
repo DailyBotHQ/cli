@@ -35,6 +35,10 @@ def cli(ctx: click.Context, api_url: Optional[str]) -> None:
       dailybot agent update "Deployed v2.1" --name "My Agent"
       dailybot agent --help
 
+    \b
+    No Dailybot account? Agents can register autonomously:
+      dailybot agent register --org-name "My Org" --agent-name "My Agent"
+
     Run without arguments for interactive mode.
     """
     if api_url:

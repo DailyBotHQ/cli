@@ -334,3 +334,56 @@ class DailyBotClient:
         if response.status_code >= 400:
             self._handle_response(response)
         return response.json()  # type: ignore[no-any-return]
+
+    def mark_agent_messages_read(
+        self,
+        message_ids: list[str],
+    ) -> dict[str, Any]:
+        """PATCH /v1/agent-messages/read/"""
+        response: httpx.Response = httpx.patch(
+            f"{self.api_url}/v1/agent-messages/read/",
+            json={"message_ids": message_ids},
+            headers=self._agent_headers(),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
+    # --- Agent registration endpoints ---
+
+    def get_registration_challenge(self) -> dict[str, Any]:
+        """GET /v1/agent/register/challenge/ — no auth required."""
+        response: httpx.Response = httpx.get(
+            f"{self.api_url}/v1/agent/register/challenge/",
+            headers=self._headers(authenticated=False),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)
+
+    def register_agent(
+        self,
+        challenge_id: str,
+        answer: int,
+        reason: str,
+        org_name: str,
+        agent_name: str,
+        contact_email: Optional[str] = None,
+        timezone: str = "UTC",
+    ) -> dict[str, Any]:
+        """POST /v1/agent/register/ — no auth required."""
+        payload: dict[str, Any] = {
+            "challenge_id": challenge_id,
+            "answer": answer,
+            "reason": reason,
+            "org_name": org_name,
+            "agent_name": agent_name,
+            "timezone": timezone,
+        }
+        if contact_email:
+            payload["contact_email"] = contact_email
+        response: httpx.Response = httpx.post(
+            f"{self.api_url}/v1/agent/register/",
+            json=payload,
+            headers=self._headers(authenticated=False),
+            timeout=self.timeout,
+        )
+        return self._handle_response(response)

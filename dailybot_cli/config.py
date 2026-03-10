@@ -18,6 +18,7 @@ CONFIG_DIR: Path = Path.home() / ".config" / "dailybot"
 CREDENTIALS_FILE: Path = CONFIG_DIR / "credentials.json"
 CONFIG_FILE: Path = CONFIG_DIR / "config.json"
 ORG_CACHE_FILE: Path = CONFIG_DIR / "org_cache.json"
+AGENTS_FILE: Path = CONFIG_DIR / "agents.json"
 
 
 def get_config_dir() -> Path:
@@ -161,3 +162,92 @@ def get_agent_auth() -> Optional[str]:
     if get_token():
         return "bearer"
     return None
+
+
+# --- Agent profiles ---
+
+
+def _slugify(name: str) -> str:
+    """Convert a display name to a simple slug for profile keys."""
+    import re
+
+    slug: str = name.lower().strip()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    return slug.strip("-") or "default"
+
+
+def load_agents() -> dict[str, Any]:
+    """Read agents.json, return {} if missing."""
+    if not AGENTS_FILE.exists():
+        return {}
+    try:
+        return json.loads(AGENTS_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_agents(data: dict[str, Any]) -> None:
+    """Write agents.json with restricted permissions."""
+    get_config_dir()
+    AGENTS_FILE.write_text(json.dumps(data, indent=2))
+    os.chmod(AGENTS_FILE, 0o600)
+
+
+def save_agent_profile(
+    profile_name: str,
+    agent_name: str,
+    api_key: Optional[str] = None,
+    agent_email: Optional[str] = None,
+) -> None:
+    """Upsert an agent profile. Sets as default if no default exists."""
+    data: dict[str, Any] = load_agents()
+    profiles: dict[str, Any] = data.setdefault("profiles", {})
+    entry: dict[str, str] = {"agent_name": agent_name}
+    if api_key:
+        entry["api_key"] = api_key
+    if agent_email:
+        entry["agent_email"] = agent_email
+    profiles[profile_name] = entry
+    if not data.get("default"):
+        data["default"] = profile_name
+    _save_agents(data)
+
+
+def get_default_profile() -> Optional[dict[str, Any]]:
+    """Return the default profile dict with its name, or None."""
+    data: dict[str, Any] = load_agents()
+    default_name: Optional[str] = data.get("default")
+    if not default_name:
+        return None
+    profiles: dict[str, Any] = data.get("profiles", {})
+    profile: Optional[dict[str, Any]] = profiles.get(default_name)
+    if not profile:
+        return None
+    return {"profile": default_name, **profile}
+
+
+def get_profile(name: str) -> Optional[dict[str, Any]]:
+    """Return a specific profile dict, or None."""
+    data: dict[str, Any] = load_agents()
+    profiles: dict[str, Any] = data.get("profiles", {})
+    profile: Optional[dict[str, Any]] = profiles.get(name)
+    if not profile:
+        return None
+    return {"profile": name, **profile}
+
+
+def list_profiles() -> list[dict[str, Any]]:
+    """Return all profiles as a list of dicts with metadata."""
+    data: dict[str, Any] = load_agents()
+    default_name: Optional[str] = data.get("default")
+    profiles: dict[str, Any] = data.get("profiles", {})
+    result: list[dict[str, Any]] = []
+    for name, entry in profiles.items():
+        result.append({
+            "profile": name,
+            "agent_name": entry.get("agent_name", ""),
+            "agent_email": entry.get("agent_email", ""),
+            "has_key": bool(entry.get("api_key")),
+            "is_default": name == default_name,
+        })
+    return result

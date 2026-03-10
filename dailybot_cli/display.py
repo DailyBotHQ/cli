@@ -122,16 +122,21 @@ def print_agent_health(data: dict[str, Any]) -> None:
         console.print(hist_table)
 
     pending: list[dict[str, Any]] = data.get("pending_messages", [])
-    if pending:
-        console.print(f"\n[bold]Pending messages ({len(pending)}):[/bold]")
-        for msg in pending:
-            sender: str = _format_sender(msg)
-            content: str = msg.get("content", "")
-            created: str = msg.get("created_at", "")
-            if sender:
-                console.print(f"  [dim]{sender}[/dim] {content} [dim]({created})[/dim]")
-            else:
-                console.print(f"  {content} [dim]({created})[/dim]")
+    print_pending_agent_messages(pending)
+
+
+def print_pending_agent_messages(messages: list[dict[str, Any]]) -> None:
+    """Display pending messages with IDs for agent consumption."""
+    if not messages:
+        return
+    console.print(f"\n--- Pending messages from Dailybot ({len(messages)}) ---")
+    for msg in messages:
+        msg_id: str = msg.get("id", "?")
+        sender: str = _format_sender(msg)
+        content: str = msg.get("content", "")
+        line: str = f"\\[id:{msg_id}] {sender} {content}" if sender else f"\\[id:{msg_id}] {content}"
+        console.print(line)
+    console.print("[dim]Claim: dailybot agent message claim <id>[/dim]")
 
 
 def print_webhook_result(data: dict[str, Any]) -> None:
@@ -194,6 +199,44 @@ def print_agent_email_sent(data: dict[str, Any]) -> None:
     if reply_to:
         table.add_row("Reply-to", reply_to)
     console.print(Panel(table, title="[bold]Email Sent[/bold]", border_style="green"))
+
+
+def print_agent_profiles(profiles: list[dict[str, Any]]) -> None:
+    """Display agent profiles in a table."""
+    if not profiles:
+        print_info("No agent profiles configured. Run: dailybot agent configure --name \"My Agent\"")
+        return
+    table: Table = Table(title="Agent Profiles", border_style="cyan")
+    table.add_column("Profile", style="bold")
+    table.add_column("Agent Name")
+    table.add_column("Email")
+    table.add_column("Auth")
+    table.add_column("Default")
+    for p in profiles:
+        auth: str = "login token"
+        if p.get("has_key"):
+            auth = p.get("masked_key", "****")
+        default: str = "[green]yes[/green]" if p.get("is_default") else ""
+        table.add_row(p["profile"], p["agent_name"], p.get("agent_email", ""), auth, default)
+    console.print(table)
+
+
+def print_registration_result(data: dict[str, Any]) -> None:
+    """Display agent registration result."""
+    table: Table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("Agent", data.get("agent_name", ""))
+    agent_email: str = data.get("agent_email", "")
+    if agent_email:
+        table.add_row("Email", f"[bold]{agent_email}[/bold]")
+    table.add_row("Org", data.get("org_name", ""))
+    if data.get("profile"):
+        table.add_row("Profile", data["profile"])
+    claim_url: str = data.get("claim_url", "")
+    if claim_url:
+        table.add_row("Claim URL", f"[bold cyan]{claim_url}[/bold cyan]")
+    console.print(Panel(table, title="[bold]Agent Registered[/bold]", border_style="green"))
 
 
 def print_update_result(data: dict[str, Any]) -> None:

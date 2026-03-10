@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+from dailybot_cli.api_client import APIError
 from dailybot_cli.main import cli
 
 
@@ -813,11 +814,14 @@ class TestAgentCommand:
             cli, ["agent", "health", "--ok", "--name", "Claude Code"]
         )
         assert result.exit_code == 0
-        assert "Pending messages (2)" in result.output
+        assert "Pending messages from Dailybot (2)" in result.output
+        assert "[id:uuid-1]" in result.output
         assert "Please review PR #42" in result.output
-        assert "John Doe" in result.output
+        assert "John Doe:" in result.output
+        assert "[id:uuid-2]" in result.output
         assert "New deployment ready" in result.output
         assert "[system]:" in result.output
+        assert "dailybot agent message claim <id>" in result.output
 
     # --- Webhook tests ---
 
@@ -1146,6 +1150,44 @@ class TestAgentCommand:
         )
 
     @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_agent_update_with_pending_messages(
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {
+            "id": 14,
+            "pending_messages": [
+                {
+                    "id": "uuid-1",
+                    "sender_type": "human",
+                    "sender_name": "John Doe",
+                    "content": "Please review PR #42",
+                },
+                {
+                    "id": "uuid-2",
+                    "sender_type": "system",
+                    "sender_name": "",
+                    "content": "New deployment ready",
+                },
+            ],
+        }
+
+        result = runner.invoke(
+            cli, ["agent", "update", "Did some work"]
+        )
+        assert result.exit_code == 0
+        assert "Report submitted" in result.output
+        assert "Pending messages from Dailybot (2)" in result.output
+        assert "[id:uuid-1]" in result.output
+        assert "John Doe:" in result.output
+        assert "Please review PR #42" in result.output
+        assert "[id:uuid-2]" in result.output
+        assert "New deployment ready" in result.output
+        assert "dailybot agent message claim <id>" in result.output
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_no_auth(
         self, mock_get_auth: MagicMock, runner: CliRunner
     ) -> None:
@@ -1326,3 +1368,299 @@ class TestConfigCommand:
         result = runner.invoke(cli, ["config", "foo=bar"])
         assert result.exit_code != 0
         assert "Unknown setting" in result.output
+
+
+class TestAgentConfigure:
+
+    @patch("dailybot_cli.commands.agent.get_token")
+    @patch("dailybot_cli.commands.agent.save_agent_profile")
+    def test_configure_otp_only(
+        self, mock_save: MagicMock, mock_token: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_token.return_value = "tok"
+        result = runner.invoke(cli, ["agent", "configure", "--name", "Claude Code"])
+        assert result.exit_code == 0
+        assert "configured" in result.output
+        mock_save.assert_called_once_with("claude-code", agent_name="Claude Code", api_key=None)
+
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    @patch("dailybot_cli.commands.agent.save_agent_profile")
+    def test_configure_with_key(
+        self, mock_save: MagicMock, mock_client_cls: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.get_agent_health.return_value = {"status": "healthy"}
+        result = runner.invoke(cli, ["agent", "configure", "--name", "CI Bot", "--key", "abc123"])
+        assert result.exit_code == 0
+        assert "configured" in result.output
+        mock_save.assert_called_once_with("ci-bot", agent_name="CI Bot", api_key="abc123")
+
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_configure_invalid_key(
+        self, mock_client_cls: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.get_agent_health.side_effect = APIError(401, "Unauthorized")
+        result = runner.invoke(cli, ["agent", "configure", "--name", "Bot", "--key", "bad"])
+        assert result.exit_code != 0
+        assert "invalid" in result.output.lower()
+
+    @patch("dailybot_cli.commands.agent.get_token")
+    def test_configure_no_key_no_login(
+        self, mock_token: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_token.return_value = None
+        result = runner.invoke(cli, ["agent", "configure", "--name", "Bot"])
+        assert result.exit_code != 0
+
+    @patch("dailybot_cli.commands.agent.get_token")
+    @patch("dailybot_cli.commands.agent.save_agent_profile")
+    def test_configure_custom_profile_name(
+        self, mock_save: MagicMock, mock_token: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_token.return_value = "tok"
+        result = runner.invoke(cli, ["agent", "configure", "--name", "Claude Code", "--profile", "myprofile"])
+        assert result.exit_code == 0
+        mock_save.assert_called_once_with("myprofile", agent_name="Claude Code", api_key=None)
+
+
+class TestAgentProfiles:
+
+    @patch("dailybot_cli.commands.agent.list_profiles")
+    @patch("dailybot_cli.commands.agent.load_agents")
+    def test_profiles_list(
+        self, mock_load: MagicMock, mock_list: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_list.return_value = [
+            {"profile": "claude-code", "agent_name": "Claude Code", "has_key": True, "is_default": True},
+            {"profile": "ci-bot", "agent_name": "CI Bot", "has_key": False, "is_default": False},
+        ]
+        mock_load.return_value = {
+            "profiles": {
+                "claude-code": {"agent_name": "Claude Code", "api_key": "abcdef1234"},
+                "ci-bot": {"agent_name": "CI Bot"},
+            },
+            "default": "claude-code",
+        }
+        result = runner.invoke(cli, ["agent", "profiles"])
+        assert result.exit_code == 0
+        assert "Claude Code" in result.output
+        assert "CI Bot" in result.output
+
+    @patch("dailybot_cli.commands.agent.load_agents")
+    @patch("dailybot_cli.commands.agent.list_profiles")
+    def test_profiles_empty(
+        self, mock_list: MagicMock, mock_load: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_list.return_value = []
+        mock_load.return_value = {}
+        result = runner.invoke(cli, ["agent", "profiles"])
+        assert result.exit_code == 0
+        assert "No agent profiles" in result.output
+
+
+class TestAgentProfileAuth:
+
+    @patch("dailybot_cli.commands.agent.get_profile")
+    @patch("dailybot_cli.commands.agent.get_default_profile")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_update_uses_profile(
+        self, mock_client_cls: MagicMock, mock_default: MagicMock, mock_get: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get.return_value = {"profile": "test", "agent_name": "Test Agent", "api_key": "key123"}
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {"id": 1}
+        result = runner.invoke(cli, ["agent", "--profile", "test", "update", "did stuff"])
+        assert result.exit_code == 0
+        mock_client.submit_agent_report.assert_called_once()
+        call_kwargs = mock_client.submit_agent_report.call_args[1]
+        assert call_kwargs["agent_name"] == "Test Agent"
+
+    @patch("dailybot_cli.commands.agent.get_default_profile")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_update_uses_default_profile(
+        self, mock_client_cls: MagicMock, mock_default: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_default.return_value = {"profile": "default", "agent_name": "Default Agent", "api_key": "k1"}
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {"id": 1}
+        result = runner.invoke(cli, ["agent", "update", "did stuff"])
+        assert result.exit_code == 0
+        call_kwargs = mock_client.submit_agent_report.call_args[1]
+        assert call_kwargs["agent_name"] == "Default Agent"
+
+    @patch("dailybot_cli.commands.agent.get_default_profile")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_name_flag_overrides_profile(
+        self, mock_client_cls: MagicMock, mock_default: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_default.return_value = {"profile": "default", "agent_name": "Default Agent", "api_key": "k1"}
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_report.return_value = {"id": 1}
+        result = runner.invoke(cli, ["agent", "update", "did stuff", "--name", "Override"])
+        assert result.exit_code == 0
+        call_kwargs = mock_client.submit_agent_report.call_args[1]
+        assert call_kwargs["agent_name"] == "Override"
+
+    @patch("dailybot_cli.commands.agent.get_profile")
+    def test_profile_not_found(
+        self, mock_get: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_get.return_value = None
+        result = runner.invoke(cli, ["agent", "--profile", "nope", "update", "test"])
+        assert result.exit_code != 0
+        assert "not found" in result.output
+
+
+class TestAgentRegister:
+
+    @patch("dailybot_cli.commands.agent.save_agent_profile")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_register_success(
+        self, mock_client_cls: MagicMock, mock_save: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.get_registration_challenge.return_value = {
+            "challenge_id": "ch-1",
+            "instruction": "The registration code for this session is 1234. To confirm you are a reasoning agent and not a script, respond with a JSON object containing two fields: 'reason' (one sentence explaining why this agent needs a DailyBot account) and 'answer' (the registration code multiplied by the number of words in this instruction).",
+            "expires_in": 300,
+        }
+        mock_client.register_agent.return_value = {
+            "api_key": "new-key-123",
+            "agent_name": "Claude Code",
+            "agent_email": "claude-code@mail.dailybot.co",
+            "org_name": "My Startup",
+            "claim_url": "https://app.dailybot.com/claim/abc123",
+        }
+        result = runner.invoke(cli, [
+            "agent", "register",
+            "--org-name", "My Startup",
+            "--agent-name", "Claude Code",
+            "--email", "me@co.com",
+        ])
+        assert result.exit_code == 0
+        assert "Registered" in result.output
+        assert "claude-code@mail.dailybot.co" in result.output
+        assert "claim" in result.output.lower()
+        mock_client.register_agent.assert_called_once_with(
+            challenge_id="ch-1",
+            answer=1234 * 52,
+            reason="Agent 'Claude Code' registering for org 'My Startup'",
+            org_name="My Startup",
+            agent_name="Claude Code",
+            contact_email="me@co.com",
+            timezone="UTC",
+        )
+        mock_save.assert_called_once_with("claude-code", agent_name="Claude Code", api_key="new-key-123", agent_email="claude-code@mail.dailybot.co")
+
+    @patch("dailybot_cli.commands.agent.save_agent_profile")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_register_without_email(
+        self, mock_client_cls: MagicMock, mock_save: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.get_registration_challenge.return_value = {
+            "challenge_id": "ch-1",
+            "instruction": "The registration code for this session is 1234. To confirm you are a reasoning agent and not a script, respond with a JSON object containing two fields: 'reason' (one sentence explaining why this agent needs a DailyBot account) and 'answer' (the registration code multiplied by the number of words in this instruction).",
+            "expires_in": 300,
+        }
+        mock_client.register_agent.return_value = {
+            "api_key": "key-1",
+            "agent_name": "Bot",
+            "agent_email": "bot@mail.dailybot.co",
+            "org_name": "Org",
+            "claim_url": "https://app.dailybot.com/claim/xyz",
+        }
+        result = runner.invoke(cli, [
+            "agent", "register",
+            "--org-name", "Org",
+            "--agent-name", "Bot",
+        ])
+        assert result.exit_code == 0
+        mock_client.register_agent.assert_called_once_with(
+            challenge_id="ch-1",
+            answer=1234 * 52,
+            reason="Agent 'Bot' registering for org 'Org'",
+            org_name="Org",
+            agent_name="Bot",
+            contact_email=None,
+            timezone="UTC",
+        )
+
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_register_challenge_expired_retries(
+        self, mock_client_cls: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_client: MagicMock = mock_client_cls.return_value
+        challenge: dict[str, Any] = {
+            "challenge_id": "ch-1",
+            "instruction": "The registration code for this session is 2000. To confirm you are a reasoning agent and not a script, respond with a JSON object containing two fields: 'reason' (one sentence explaining why this agent needs a DailyBot account) and 'answer' (the registration code multiplied by the number of words in this instruction).",
+            "expires_in": 300,
+        }
+        mock_client.get_registration_challenge.return_value = challenge
+        mock_client.register_agent.side_effect = [
+            APIError(400, "Challenge expired"),
+            {"api_key": "k", "agent_name": "A", "org_name": "O", "claim_url": "https://app.dailybot.com/claim/x"},
+        ]
+        with patch("dailybot_cli.commands.agent.save_agent_profile"):
+            result = runner.invoke(cli, [
+                "agent", "register",
+                "--org-name", "O", "--agent-name", "A", "--email", "a@b.com",
+            ])
+        assert result.exit_code == 0
+        assert "Registered" in result.output
+
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_register_rate_limited(
+        self, mock_client_cls: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.get_registration_challenge.return_value = {
+            "challenge_id": "ch-1",
+            "instruction": "The registration code for this session is 5000. To confirm.",
+            "expires_in": 300,
+        }
+        mock_client.register_agent.side_effect = APIError(429, "Too many requests")
+        result = runner.invoke(cli, [
+            "agent", "register",
+            "--org-name", "O", "--agent-name", "A", "--email", "a@b.com",
+        ])
+        assert result.exit_code != 0
+        assert "Rate limited" in result.output
+
+
+class TestAgentMessageClaim:
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.get_default_profile")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_claim_messages(
+        self, mock_client_cls: MagicMock, mock_default: MagicMock, mock_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_default.return_value = None
+        mock_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.mark_agent_messages_read.return_value = {"updated": 2}
+        result = runner.invoke(cli, ["agent", "message", "claim", "uuid-1", "uuid-2"])
+        assert result.exit_code == 0
+        assert "2 message(s)" in result.output
+        mock_client.mark_agent_messages_read.assert_called_once_with(message_ids=["uuid-1", "uuid-2"])
+
+    @patch("dailybot_cli.commands.agent.get_agent_auth")
+    @patch("dailybot_cli.commands.agent.get_default_profile")
+    @patch("dailybot_cli.commands.agent.DailyBotClient")
+    def test_claim_all(
+        self, mock_client_cls: MagicMock, mock_default: MagicMock, mock_auth: MagicMock, runner: CliRunner
+    ) -> None:
+        mock_default.return_value = None
+        mock_auth.return_value = "api_key"
+        mock_client: MagicMock = mock_client_cls.return_value
+        mock_client.submit_agent_health.return_value = {
+            "agent_name": "CLI Agent", "status": "healthy", "last_check": "now",
+        }
+        result = runner.invoke(cli, ["agent", "message", "claim-all"])
+        assert result.exit_code == 0
+        assert "delivered" in result.output.lower()
+        mock_client.submit_agent_health.assert_called_once_with(
+            agent_name="CLI Agent", ok=True, message=None,
+        )
