@@ -4,40 +4,27 @@ The command-line bridge between **humans** and **agents**. [Dailybot](https://ww
 
 ## Installation
 
-### macOS (Homebrew)
-
-```bash
-brew install dailybothq/tap/dailybot
-```
-
-### Linux (binary)
-
-Download the latest binary from [GitHub Releases](https://github.com/DailyBotHQ/cli/releases):
-
-```bash
-curl -sSL https://cli.dailybot.com/install.sh | bash
-```
-
-Or manually:
-
-```bash
-curl -sL https://github.com/DailyBotHQ/cli/releases/latest/download/dailybot-linux-x86_64 -o /usr/local/bin/dailybot
-chmod +x /usr/local/bin/dailybot
-```
-
-### Windows
-
-```bash
-pip install dailybot-cli
-```
-
-### pip (all platforms)
-
 ```bash
 pip install dailybot-cli
 ```
 
 Requires Python 3.9+.
+
+### Alternative installation methods
+
+**macOS (Homebrew)**
+
+```bash
+brew install dailybothq/tap/dailybot
+```
+
+**Linux (binary)**
+
+```bash
+curl -sSL https://cli.dailybot.com/install.sh | bash
+```
+
+Or download directly from [GitHub Releases](https://github.com/DailyBotHQ/cli/releases).
 
 ## For humans
 
