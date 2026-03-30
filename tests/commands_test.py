@@ -686,9 +686,10 @@ class TestAgentCommand:
             co_authors=None,
         )
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_update_no_api_key(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "update", "test"])
@@ -766,9 +767,10 @@ class TestAgentCommand:
         assert "Claude Code" in result.output
         mock_client.get_agent_health.assert_called_once_with(agent_name="Claude Code")
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_health_no_api_key(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "health", "--ok"])
@@ -868,9 +870,10 @@ class TestAgentCommand:
         assert result.exit_code == 0
         assert "Webhook unregistered" in result.output
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_webhook_register_no_api_key(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(
@@ -878,9 +881,10 @@ class TestAgentCommand:
         )
         assert result.exit_code != 0
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_webhook_unregister_no_api_key(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "webhook", "unregister"])
@@ -888,10 +892,11 @@ class TestAgentCommand:
 
     # --- Message tests ---
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_message_send(
-        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
@@ -1017,9 +1022,10 @@ class TestAgentCommand:
             agent_name="Claude Code", delivered=False
         )
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_message_send_no_api_key(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(
@@ -1027,18 +1033,20 @@ class TestAgentCommand:
         )
         assert result.exit_code != 0
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_message_list_no_api_key(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "message", "list", "--name", "Bot"])
         assert result.exit_code != 0
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_update_milestone(
-        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
@@ -1060,10 +1068,11 @@ class TestAgentCommand:
             co_authors=None,
         )
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_update_co_authors(
-        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
@@ -1090,10 +1099,11 @@ class TestAgentCommand:
             co_authors=["alice@co.com", "bob@co.com"],
         )
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_update_co_authors_comma_separated(
-        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
@@ -1120,10 +1130,11 @@ class TestAgentCommand:
             co_authors=["alice@co.com", "bob@co.com"],
         )
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_agent_update_milestone_and_co_authors(
-        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
@@ -1187,9 +1198,10 @@ class TestAgentCommand:
         assert "New deployment ready" in result.output
         assert "dailybot agent message claim <id>" in result.output
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_agent_no_auth(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(cli, ["agent", "update", "test"])
@@ -1287,9 +1299,10 @@ class TestAgentEmailCommand:
         assert result.exit_code != 0
         assert "Hourly email limit exceeded" in result.output
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     def test_email_send_no_auth(
-        self, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = None
         result = runner.invoke(
@@ -1301,10 +1314,11 @@ class TestAgentEmailCommand:
         )
         assert result.exit_code != 0
 
+    @patch("dailybot_cli.commands.agent.get_default_profile", return_value=None)
     @patch("dailybot_cli.commands.agent.get_agent_auth")
     @patch("dailybot_cli.commands.agent.DailyBotClient")
     def test_email_send_with_metadata(
-        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, runner: CliRunner
+        self, mock_client_cls: MagicMock, mock_get_auth: MagicMock, _mock_profile: MagicMock, runner: CliRunner
     ) -> None:
         mock_get_auth.return_value = "api_key"
         mock_client: MagicMock = mock_client_cls.return_value
