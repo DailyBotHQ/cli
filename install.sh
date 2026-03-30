@@ -2,8 +2,9 @@
 # DailyBot CLI installer
 # Usage: curl -sSL https://cli.dailybot.com/install.sh | bash
 #
-# Tries to install a pre-built binary (no Python required).
-# Falls back to pip/pipx if no binary is available for this platform.
+# macOS  → Homebrew (brew install dailybothq/tap/dailybot)
+# Linux  → Pre-built binary, fallback to pip
+# Others → pip install
 
 set -euo pipefail
 
@@ -21,74 +22,91 @@ success() { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn()    { printf '\033[1;33m==>\033[0m %s\n' "$*" >&2; }
 error()   { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; }
 
-# --- Try pre-built binary first (no Python needed) ---
-
-install_binary() {
-    local os arch asset install_dir
-
-    os="$(uname -s)"
-    arch="$(uname -m)"
-
-    case "$os" in
-        Linux*)
-            asset="dailybot-linux-x86_64"
-            ;;
-        Darwin*)
-            asset="dailybot-macos"
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-
-    install_dir="/usr/local/bin"
-
-    # Get latest release tag
-    local latest
-    latest=$(curl -sI "https://github.com/$REPO/releases/latest" \
-        | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
-
-    if [ -z "$latest" ]; then
-        return 1
-    fi
-
-    local url="https://github.com/$REPO/releases/download/$latest/$asset"
-
-    # Check that the asset actually exists
-    local status_code
-    status_code=$(curl -sI -o /dev/null -w "%{http_code}" "$url")
-    if [ "$status_code" != "200" ] && [ "$status_code" != "302" ]; then
-        return 1
-    fi
-
-    info "Downloading $COMMAND ($latest) for $os/$arch..."
-    curl -sL "$url" -o "/tmp/$COMMAND"
-    chmod +x "/tmp/$COMMAND"
-
-    info "Installing to $install_dir/$COMMAND..."
-    if [ -w "$install_dir" ]; then
-        mv "/tmp/$COMMAND" "$install_dir/$COMMAND"
-    else
-        sudo mv "/tmp/$COMMAND" "$install_dir/$COMMAND"
-    fi
-
-    return 0
-}
-
-if install_binary; then
+finish() {
     echo ""
-    success "DailyBot CLI installed successfully! ($($COMMAND --version 2>&1))"
+    if has "$COMMAND"; then
+        success "DailyBot CLI installed successfully! ($($COMMAND --version 2>&1))"
+    else
+        success "DailyBot CLI installed successfully!"
+        warn "The '$COMMAND' command is not on your PATH yet."
+        echo "  You may need to restart your terminal or add the install directory to PATH."
+    fi
     echo ""
     echo "  Get started:"
     echo "    dailybot login"
     echo "    dailybot --help"
     echo ""
+}
+
+# --- Detect OS ---
+
+OS="$(uname -s)"
+
+# =============================================================================
+# macOS → Homebrew
+# =============================================================================
+if [ "$OS" = "Darwin" ]; then
+    if ! has brew; then
+        error "Homebrew is required on macOS."
+        echo ""
+        echo "  Install Homebrew first:"
+        echo '    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        echo ""
+        echo "  Then re-run this script."
+        exit 1
+    fi
+
+    info "Installing via Homebrew..."
+    brew install dailybothq/tap/dailybot
+    finish
     exit 0
 fi
 
-warn "No pre-built binary available for this platform. Falling back to pip..."
+# =============================================================================
+# Linux → Binary download, fallback to pip
+# =============================================================================
+if [ "$OS" = "Linux" ]; then
+    install_binary() {
+        local latest url status_code install_dir="/usr/local/bin"
 
-# --- Fallback: pip-based install (requires Python) ---
+        latest=$(curl -sI "https://github.com/$REPO/releases/latest" \
+            | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
+
+        if [ -z "$latest" ]; then
+            return 1
+        fi
+
+        url="https://github.com/$REPO/releases/download/$latest/dailybot-linux-x86_64"
+
+        status_code=$(curl -sI -o /dev/null -w "%{http_code}" "$url")
+        if [ "$status_code" != "200" ] && [ "$status_code" != "302" ]; then
+            return 1
+        fi
+
+        info "Downloading dailybot ($latest) for Linux..."
+        curl -sL "$url" -o "/tmp/$COMMAND"
+        chmod +x "/tmp/$COMMAND"
+
+        info "Installing to $install_dir/$COMMAND..."
+        if [ -w "$install_dir" ]; then
+            mv "/tmp/$COMMAND" "$install_dir/$COMMAND"
+        else
+            sudo mv "/tmp/$COMMAND" "$install_dir/$COMMAND"
+        fi
+        return 0
+    }
+
+    if install_binary; then
+        finish
+        exit 0
+    fi
+
+    warn "Binary download failed. Falling back to pip..."
+fi
+
+# =============================================================================
+# Fallback: pip-based install (Linux fallback + Windows + other)
+# =============================================================================
 
 in_virtualenv() {
     "$PYTHON" -c "import sys; sys.exit(0 if (hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)) else 1)" 2>/dev/null
@@ -139,7 +157,7 @@ if ! $installed && has uv; then
     fi
 fi
 
-# 3. pip inside an active virtualenv (safe, no system pollution)
+# 3. pip inside an active virtualenv
 if ! $installed && in_virtualenv; then
     info "Virtualenv detected, installing with pip..."
     if $PYTHON -m pip install --upgrade "$PACKAGE" 2>&1; then
@@ -195,17 +213,4 @@ if ! $installed; then
     exit 1
 fi
 
-echo ""
-if has "$COMMAND"; then
-    success "DailyBot CLI installed successfully! ($($COMMAND --version 2>&1))"
-else
-    success "DailyBot CLI installed successfully!"
-    warn "The '$COMMAND' command is not on your PATH yet."
-    echo "  You may need to restart your terminal or add the install directory to PATH."
-fi
-
-echo ""
-echo "  Get started:"
-echo "    dailybot login"
-echo "    dailybot --help"
-echo ""
+finish

@@ -1,4 +1,4 @@
-name: Release Binaries
+name: Release
 
 on:
   push:
@@ -9,22 +9,9 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            artifact: dailybot-macos
-            pyinstaller_name: dailybot
-          - os: ubuntu-latest
-            artifact: dailybot-linux-x86_64
-            pyinstaller_name: dailybot
-          - os: windows-latest
-            artifact: dailybot-windows-x86_64.exe
-            pyinstaller_name: dailybot.exe
-
-    runs-on: ${{ matrix.os }}
-
+  # Build Linux binary (only platform where unsigned binaries work well)
+  build-linux:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -41,28 +28,108 @@ jobs:
         run: |
           pyinstaller --onefile --name dailybot --clean dailybot_cli/main.py
 
-      - name: Rename artifact
-        shell: bash
-        run: |
-          mv dist/${{ matrix.pyinstaller_name }} dist/${{ matrix.artifact }}
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}
+          name: dailybot-linux-x86_64
+          path: dist/dailybot
 
+  # Publish to PyPI
+  publish-pypi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build package
+        run: |
+          pip install build twine
+          python -m build
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          twine upload dist/*
+
+  # Create GitHub Release with Linux binary
   release:
-    needs: build
+    needs: [build-linux, publish-pypi]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: dailybot-linux-x86_64
           path: artifacts
-          merge-multiple: true
+
+      - name: Rename binary
+        run: mv artifacts/dailybot artifacts/dailybot-linux-x86_64
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: artifacts/*
+
+  # Update Homebrew tap
+  update-homebrew:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download sdist and get sha256
+        id: sha
+        run: |
+          pip download dailybot-cli==${{ steps.version.outputs.version }} --no-binary :all: --no-deps -d /tmp/sdist
+          SHA=$(sha256sum /tmp/sdist/dailybot_cli-${{ steps.version.outputs.version }}.tar.gz | cut -d' ' -f1)
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: DailyBotHQ/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        run: |
+          cat > homebrew-tap/Formula/dailybot.rb << 'FORMULA'
+          class Dailybot < Formula
+            include Language::Python::Virtualenv
+
+            desc "The command-line bridge between humans and agents"
+            homepage "https://www.dailybot.com"
+            url "https://files.pythonhosted.org/packages/source/d/dailybot-cli/dailybot_cli-VERSION.tar.gz"
+            sha256 "SHA256"
+            license "MIT"
+
+            depends_on "python@3.12"
+
+            def install
+              virtualenv = virtualenv_create(libexec, "python3.12")
+              virtualenv.pip_install_and_link buildpath
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/dailybot --version")
+            end
+          end
+          FORMULA
+          sed -i "s/VERSION/${{ steps.version.outputs.version }}/g" homebrew-tap/Formula/dailybot.rb
+          sed -i "s/SHA256/${{ steps.sha.outputs.sha256 }}/g" homebrew-tap/Formula/dailybot.rb
+
+      - name: Commit and push
+        working-directory: homebrew-tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/dailybot.rb
+          git commit -m "Update dailybot to ${{ steps.version.outputs.version }}"
+          git push
