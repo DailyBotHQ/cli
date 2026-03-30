@@ -268,33 +268,6 @@ pip install -e ".[dev]"
 pytest
 ```
 
-## Build & Release
-
-Releases are automated via GitHub Actions. To publish a new version:
-
-1. Bump the version in `pyproject.toml`
-2. Commit the change
-3. Tag and push:
-
-```bash
-git tag v0.X.Y
-git push origin main && git push origin v0.X.Y
-```
-
-This automatically:
-- Publishes the package to [PyPI](https://pypi.org/project/dailybot-cli/)
-- Builds a Linux binary and attaches it to the [GitHub Release](https://github.com/DailyBotHQ/cli/releases)
-- Updates the [Homebrew tap](https://github.com/DailyBotHQ/homebrew-tap) formula
-
-### Required repository secrets
-
-| Secret | Purpose |
-|---|---|
-| `PYPI_API_TOKEN` | PyPI API token for publishing |
-| `HOMEBREW_TAP_TOKEN` | GitHub PAT with write access to `DailyBotHQ/homebrew-tap` |
-
-Add these in the repo settings under **Settings → Secrets and variables → Actions**.
-
 ## License
 
 [MIT](LICENSE)
