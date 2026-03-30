@@ -25,6 +25,12 @@ curl -sL https://github.com/DailyBotHQ/cli/releases/latest/download/dailybot-lin
 chmod +x /usr/local/bin/dailybot
 ```
 
+### Windows
+
+```bash
+pip install dailybot-cli
+```
+
 ### pip (all platforms)
 
 ```bash
