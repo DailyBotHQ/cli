@@ -4,14 +4,31 @@ The command-line bridge between **humans** and **agents**. [Dailybot](https://ww
 
 ## Installation
 
+### macOS (Homebrew)
+
 ```bash
-pip install dailybot-cli
+brew install dailybothq/tap/dailybot
 ```
 
-Or via the install script:
+### Linux (binary)
+
+Download the latest binary from [GitHub Releases](https://github.com/DailyBotHQ/cli/releases):
 
 ```bash
 curl -sSL https://cli.dailybot.com/install.sh | bash
+```
+
+Or manually:
+
+```bash
+curl -sL https://github.com/DailyBotHQ/cli/releases/latest/download/dailybot-linux-x86_64 -o /usr/local/bin/dailybot
+chmod +x /usr/local/bin/dailybot
+```
+
+### pip (all platforms)
+
+```bash
+pip install dailybot-cli
 ```
 
 Requires Python 3.9+.
@@ -250,6 +267,33 @@ Run `dailybot --help` or `dailybot <command> --help` for full details on any com
 pip install -e ".[dev]"
 pytest
 ```
+
+## Build & Release
+
+Releases are automated via GitHub Actions. To publish a new version:
+
+1. Bump the version in `pyproject.toml`
+2. Commit the change
+3. Tag and push:
+
+```bash
+git tag v0.X.Y
+git push origin main && git push origin v0.X.Y
+```
+
+This automatically:
+- Publishes the package to [PyPI](https://pypi.org/project/dailybot-cli/)
+- Builds a Linux binary and attaches it to the [GitHub Release](https://github.com/DailyBotHQ/cli/releases)
+- Updates the [Homebrew tap](https://github.com/DailyBotHQ/homebrew-tap) formula
+
+### Required repository secrets
+
+| Secret | Purpose |
+|---|---|
+| `PYPI_API_TOKEN` | PyPI API token for publishing |
+| `HOMEBREW_TAP_TOKEN` | GitHub PAT with write access to `DailyBotHQ/homebrew-tap` |
+
+Add these in the repo settings under **Settings → Secrets and variables → Actions**.
 
 ## License
 
