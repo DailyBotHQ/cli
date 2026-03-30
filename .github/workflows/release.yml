@@ -14,10 +14,7 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            artifact: dailybot-macos-arm64
-            pyinstaller_name: dailybot
-          - os: macos-13
-            artifact: dailybot-macos-x86_64
+            artifact: dailybot-macos
             pyinstaller_name: dailybot
           - os: ubuntu-latest
             artifact: dailybot-linux-x86_64

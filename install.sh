@@ -34,10 +34,7 @@ install_binary() {
             asset="dailybot-linux-x86_64"
             ;;
         Darwin*)
-            case "$arch" in
-                arm64) asset="dailybot-macos-arm64" ;;
-                *)     asset="dailybot-macos-x86_64" ;;
-            esac
+            asset="dailybot-macos"
             ;;
         *)
             return 1
