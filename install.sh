@@ -2,14 +2,12 @@
 # DailyBot CLI installer
 # Usage: curl -sSL https://cli.dailybot.com/install.sh | bash
 #
-# Installs the dailybot-cli package using the best available method:
-#   1. pipx   (isolated environment, recommended)
-#   2. uv     (isolated environment, fast)
-#   3. pip    (if already inside a virtualenv)
-#   4. pip --user (last resort)
+# Tries to install a pre-built binary (no Python required).
+# Falls back to pip/pipx if no binary is available for this platform.
 
 set -euo pipefail
 
+REPO="DailyBotHQ/cli"
 PACKAGE="dailybot-cli"
 COMMAND="dailybot"
 MIN_PYTHON="3.9"
@@ -23,11 +21,81 @@ success() { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn()    { printf '\033[1;33m==>\033[0m %s\n' "$*" >&2; }
 error()   { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; }
 
+# --- Try pre-built binary first (no Python needed) ---
+
+install_binary() {
+    local os arch asset install_dir
+
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os" in
+        Linux*)
+            asset="dailybot-linux-x86_64"
+            ;;
+        Darwin*)
+            case "$arch" in
+                arm64) asset="dailybot-macos-arm64" ;;
+                *)     asset="dailybot-macos-x86_64" ;;
+            esac
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    install_dir="/usr/local/bin"
+
+    # Get latest release tag
+    local latest
+    latest=$(curl -sI "https://github.com/$REPO/releases/latest" \
+        | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
+
+    if [ -z "$latest" ]; then
+        return 1
+    fi
+
+    local url="https://github.com/$REPO/releases/download/$latest/$asset"
+
+    # Check that the asset actually exists
+    local status_code
+    status_code=$(curl -sI -o /dev/null -w "%{http_code}" "$url")
+    if [ "$status_code" != "200" ] && [ "$status_code" != "302" ]; then
+        return 1
+    fi
+
+    info "Downloading $COMMAND ($latest) for $os/$arch..."
+    curl -sL "$url" -o "/tmp/$COMMAND"
+    chmod +x "/tmp/$COMMAND"
+
+    info "Installing to $install_dir/$COMMAND..."
+    if [ -w "$install_dir" ]; then
+        mv "/tmp/$COMMAND" "$install_dir/$COMMAND"
+    else
+        sudo mv "/tmp/$COMMAND" "$install_dir/$COMMAND"
+    fi
+
+    return 0
+}
+
+if install_binary; then
+    echo ""
+    success "DailyBot CLI installed successfully! ($($COMMAND --version 2>&1))"
+    echo ""
+    echo "  Get started:"
+    echo "    dailybot login"
+    echo "    dailybot --help"
+    echo ""
+    exit 0
+fi
+
+warn "No pre-built binary available for this platform. Falling back to pip..."
+
+# --- Fallback: pip-based install (requires Python) ---
+
 in_virtualenv() {
     "$PYTHON" -c "import sys; sys.exit(0 if (hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)) else 1)" 2>/dev/null
 }
-
-# --- Find Python >= 3.9 ---
 
 PYTHON=""
 for cmd in python3 python; do
@@ -51,8 +119,6 @@ if [ -z "$PYTHON" ]; then
 fi
 
 info "Found $($PYTHON --version 2>&1)"
-
-# --- Install ---
 
 installed=false
 
@@ -106,7 +172,6 @@ if ! $installed; then
         if $PYTHON -m pip install --user --upgrade "$PACKAGE" 2>&1; then
             installed=true
 
-            # Check if ~/.local/bin is in PATH
             user_bin="$($PYTHON -c "import site; print(site.getusersitepackages().replace('/lib/python', '/bin').split('/lib/')[0] + '/bin')" 2>/dev/null || echo "$HOME/.local/bin")"
             case ":$PATH:" in
                 *":$user_bin:"*) ;;
@@ -132,8 +197,6 @@ if ! $installed; then
     echo "    pip install $PACKAGE"
     exit 1
 fi
-
-# --- Verify ---
 
 echo ""
 if has "$COMMAND"; then
