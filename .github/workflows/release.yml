@@ -15,19 +15,24 @@ jobs:
   # Build Linux binary (only platform where unsigned binaries work well)
   build-linux:
     runs-on: ubuntu-latest
-    container:
-      image: quay.io/pypa/manylinux_2_28_x86_64
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Install dependencies
         run: |
-          python3.12 -m pip install pyinstaller
-          python3.12 -m pip install -e .
+          sudo apt-get update && sudo apt-get install -y scons
+          pip install pyinstaller staticx
+          pip install -e .
 
       - name: Build binary
         run: |
-          python3.12 -m PyInstaller --onefile --name dailybot --clean dailybot_cli/main.py
+          pyinstaller --onefile --name dailybot --clean dailybot_cli/main.py
+          staticx dist/dailybot dist/dailybot-static
+          mv dist/dailybot-static dist/dailybot
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
