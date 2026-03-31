@@ -218,7 +218,7 @@ jobs:
                 assert_match version.to_s, shell_output(\"#{bin}/dailybot --version\")
               end
             end
-          ''').strip().format(version=v, sha256=s)
+          ''').strip().replace('{version}', v).replace('{sha256}', s)
           with open('homebrew-tap/Formula/dailybot.rb', 'w') as f:
               f.write(formula + '\n')
           "
