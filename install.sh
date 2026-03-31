@@ -25,7 +25,16 @@ error()   { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; }
 finish() {
     echo ""
     if has "$COMMAND"; then
-        success "DailyBot CLI installed successfully! ($($COMMAND --version 2>&1))"
+        ver=$($COMMAND --version 2>&1) && rc=$? || rc=$?
+        if [ $rc -eq 0 ]; then
+            success "DailyBot CLI installed successfully! ($ver)"
+        else
+            warn "DailyBot CLI was installed but may not be working correctly."
+            warn "Running 'dailybot --version' failed:"
+            echo "  $ver"
+            echo ""
+            echo "  Try: pip install --force-reinstall dailybot-cli"
+        fi
     else
         success "DailyBot CLI installed successfully!"
         warn "The '$COMMAND' command is not on your PATH yet."

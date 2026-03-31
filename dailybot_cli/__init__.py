@@ -1,3 +1,8 @@
 """Dailybot CLI - The command-line bridge between humans and agents."""
 
-__version__: str = "0.4.0"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__: str = version("dailybot-cli")
+except PackageNotFoundError:
+    __version__: str = "0.0.0"
