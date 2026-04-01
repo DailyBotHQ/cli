@@ -18,21 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
+      - name: Build binary in container with glibc 2.31
         run: |
-          sudo apt-get update && sudo apt-get install -y scons
-          pip install pyinstaller staticx setuptools
-          pip install -e .
-
-      - name: Build binary
-        run: |
-          pyinstaller --onefile --name dailybot --clean dailybot_cli/main.py
-          staticx dist/dailybot dist/dailybot-static
-          mv dist/dailybot-static dist/dailybot
+          docker run --rm -v "$PWD":/src -w /src python:3.12-slim-bullseye sh -c '
+            apt-get update && apt-get install -y binutils
+            pip install pyinstaller
+            pip install -e .
+            pyinstaller --onefile --name dailybot --clean dailybot_cli/main.py
+          '
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
