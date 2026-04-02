@@ -77,6 +77,14 @@ fi
 if [ "$OS" = "Linux" ]; then
     install_binary() {
         local latest url status_code install_dir="/usr/local/bin"
+        local arch
+        arch="$(uname -m)"
+
+        # Only x86_64 binary is available; skip on other architectures
+        if [ "$arch" != "x86_64" ]; then
+            warn "Pre-built binary is only available for x86_64 (detected: $arch)."
+            return 1
+        fi
 
         latest=$(curl -sI "https://github.com/$REPO/releases/latest" \
             | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
