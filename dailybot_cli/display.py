@@ -225,7 +225,7 @@ def print_registration_result(data: dict[str, Any]) -> None:
     """Display agent registration result."""
     table: Table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="bold")
-    table.add_column()
+    table.add_column(no_wrap=True, overflow="fold")
     table.add_row("Agent", data.get("agent_name", ""))
     agent_email: str = data.get("agent_email", "")
     if agent_email:
@@ -237,6 +237,8 @@ def print_registration_result(data: dict[str, Any]) -> None:
     if claim_url:
         table.add_row("Claim URL", f"[bold cyan]{claim_url}[/bold cyan]")
     console.print(Panel(table, title="[bold]Agent Registered[/bold]", border_style="green"))
+    if claim_url:
+        console.print(f"\nClaim URL: {claim_url}")
 
 
 def print_update_result(data: dict[str, Any]) -> None:
